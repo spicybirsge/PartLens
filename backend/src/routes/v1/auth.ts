@@ -57,7 +57,7 @@ router.get('/google/callback', async (req, res) => {
                 }),
         });
         const tokens = await tokenRes.json();
-        console.log(tokens)
+   
 
         const profileRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
                 headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -65,7 +65,7 @@ router.get('/google/callback', async (req, res) => {
 
         const profile = await profileRes.json();
    
-        console.log(profile)
+    
 
         let [user] = await database.select().from(usersTable).where(eq(usersTable.googleId, profile.sub))
 
