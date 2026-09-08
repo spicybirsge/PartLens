@@ -30,8 +30,10 @@ export const sessionTable = pgTable("sessions", {
 
   ipAddress: varchar("ip_address", { length: 45 }), // 45 = max IPv6 length
   userAgent: varchar("user_agent", { length: 512 }),
+    lastActive: timestamp("last_active", { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index("sessions_user_id_idx").on(table.userId),
+
 }));
 
 

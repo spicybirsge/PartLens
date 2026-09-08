@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ADD COLUMN "last_active" timestamp with time zone DEFAULT now();

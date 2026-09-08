@@ -8,6 +8,13 @@
       "when": 1788879239074,
       "tag": "0000_ordinary_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788893755511,
+      "tag": "0001_far_whizzer",
+      "breakpoints": true
     }
   ]
 }
