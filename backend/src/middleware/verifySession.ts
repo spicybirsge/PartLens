@@ -61,6 +61,8 @@ const verifySession: RequestHandler = async (req, res, next) => {
         }).where(eq(sessionTable.tokenHash, tokenHash)).returning()
     }
 
+    req.session = session;
+
     const [user] = await database.select({
         id: usersTable.id,
         username: usersTable.username,

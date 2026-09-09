@@ -5,7 +5,7 @@ import crypto from "crypto"
 import { nanoid } from "nanoid"
 import { database } from "../../db/index.js"
 import { usersTable, sessionTable } from "../../db/schema.js"
-import { eq } from "drizzle-orm"
+import { and, eq, ne, lte } from "drizzle-orm"
 import verifySession from "../../middleware/verifySession.js"
 
 router.get('/google', async (req, res) => {
@@ -121,6 +121,50 @@ router.post("/obtain-session", async (req, res) => {
 router.get('/account', verifySession, async (req, res) => {
         return res.json({ success: true, message: "authentication success", user: req.user, code: 200 })
 })
+
+router.post("/logout", verifySession, async (req, res) => {
+       await database.delete(sessionTable).where(eq(sessionTable.id, req.session!.id))
+
+       return res.status(200).json({ success: true, message: "session terminated", code: 200 })
+})
+
+router.post("/logout-all", verifySession, async (req, res) => {
+       await database.delete(sessionTable).where(and(
+               eq(sessionTable.userId, req.session!.userId),
+               ne(sessionTable.id, req.session!.id)
+       ))
+
+       return res.status(200).json({ success: true, message: "other sessions terminated", code: 200 })
+})
+
+router.get("/sessions", verifySession, async (req, res) => {
+       const now = new Date()
+
+       await database.delete(sessionTable).where(and(
+               eq(sessionTable.userId, req.session!.userId),
+               lte(sessionTable.expiresAt, now)
+       ))
+
+       const sessions = await database.select({
+               id: sessionTable.id,
+               ipAddress: sessionTable.ipAddress,
+               userAgent: sessionTable.userAgent,
+               createdAt: sessionTable.createdAt,
+               lastActive: sessionTable.lastActive,
+               expiresAt: sessionTable.expiresAt
+       }).from(sessionTable).where(eq(sessionTable.userId, req.session!.userId))
+
+       return res.status(200).json({
+               success: true,
+               message: "active sessions retrieved",
+               sessions: sessions.map((session) => ({
+                       ...session,
+                       current: session.id === req.session!.id
+               })),
+               code: 200
+       })
+})
+
 
 
 
