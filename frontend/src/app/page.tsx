@@ -5,7 +5,6 @@ export default function Home() {
     <main>
       <h1>Machine Viewer</h1>
 
-      <ModelViewer />
     </main>
   );
 }
