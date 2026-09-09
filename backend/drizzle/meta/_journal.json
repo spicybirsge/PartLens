@@ -15,6 +15,13 @@
       "when": 1788893755511,
       "tag": "0001_far_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788935847445,
+      "tag": "0002_brief_triathlon",
+      "breakpoints": true
     }
   ]
 }

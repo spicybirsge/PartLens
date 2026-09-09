@@ -6,6 +6,7 @@ import { nanoid } from "nanoid"
 import { database } from "../../db/index.js"
 import { usersTable, sessionTable } from "../../db/schema.js"
 import { eq } from "drizzle-orm"
+import verifySession from "../../middleware/verifySession.js"
 
 router.get('/google', async (req, res) => {
 
@@ -57,15 +58,15 @@ router.get('/google/callback', async (req, res) => {
                 }),
         });
         const tokens = await tokenRes.json();
-   
+
 
         const profileRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
                 headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
 
         const profile = await profileRes.json();
-   
-    
+
+
 
         let [user] = await database.select().from(usersTable).where(eq(usersTable.googleId, profile.sub))
 
@@ -84,12 +85,13 @@ router.get('/google/callback', async (req, res) => {
         const tokenHash = crypto.createHash("sha256").update(sessionToken).digest("hex");
         const callbackToken = crypto.randomBytes(32).toString("base64url");
 
+        const userAgent = req.header("user-agent") ?? "unknown";
         await database.insert(sessionTable).values({
                 userId: user.id,
                 tokenHash: tokenHash,
                 expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
                 ipAddress: req.ip,
-                userAgent: req.header("user-agent")
+                userAgent: userAgent
         })
 
         await redisClient.set(`${process.env.REDIS_PREFIX}:auth:callback:${callbackToken}`, sessionToken, { EX: 60 })
@@ -97,23 +99,29 @@ router.get('/google/callback', async (req, res) => {
 })
 
 
-router.post("/obtain-session", async(req, res) => {
-        const {callback_code} = req.body;
+router.post("/obtain-session", async (req, res) => {
+        const { callback_code } = req.body;
 
-        if(!callback_code) {
-                return res.status(400).json({success: false, message: "invalid request", code:400})
+        if (!callback_code) {
+                return res.status(400).json({ success: false, message: "invalid request", code: 400 })
         }
 
         let key = `${process.env.REDIS_PREFIX}:auth:callback:${callback_code}`
         let sessionToken = await redisClient.get(key)
-        if(!sessionToken) {
-                return res.status(400).json({success: false, message: "invalid callback code", code:400})   
+        if (!sessionToken) {
+                return res.status(400).json({ success: false, message: "invalid callback code", code: 400 })
         }
         await redisClient.del(key)
 
-        return res.status(200).json({success: true, message: "success", token: sessionToken, code:200})
+        return res.status(200).json({ success: true, message: "success", token: sessionToken, code: 200 })
 
 })
+
+
+router.get('/account', verifySession, async (req, res) => {
+        return res.json({ success: true, message: "authentication success", user: req.user, code: 200 })
+})
+
 
 
 export default router

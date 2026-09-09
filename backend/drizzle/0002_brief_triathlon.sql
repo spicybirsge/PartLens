@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ALTER COLUMN "last_active" SET NOT NULL;
