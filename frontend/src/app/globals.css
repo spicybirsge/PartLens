@@ -127,3 +127,15 @@
     @apply font-sans;
     }
 }
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+}
+
+
+@layer base {
+  button:not(:disabled), 
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
