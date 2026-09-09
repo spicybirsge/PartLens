@@ -118,7 +118,7 @@ router.post("/obtain-session", async (req, res) => {
 })
 
 
-router.get('/account', verifySession, async (req, res) => {
+router.get('/me', verifySession, async (req, res) => {
         return res.json({ success: true, message: "authentication success", user: req.user, code: 200 })
 })
 
