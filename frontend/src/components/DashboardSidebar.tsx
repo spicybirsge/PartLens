@@ -87,7 +87,7 @@ function UserMenu() {
         }
       >
         <Avatar size="sm">
-          <AvatarImage src={user.avatarURL || undefined} alt={user.name} />
+          <AvatarImage src={user.avatarUrl || undefined} alt={user.name} />
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
         <span className="grid flex-1 text-left text-sm leading-tight">
@@ -107,7 +107,7 @@ function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex items-center gap-2">
             <Avatar size="sm">
-              <AvatarImage src={user.avatarURL || undefined} alt={user.name} />
+              <AvatarImage src={user.avatarUrl || undefined} alt={user.name} />
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div className="grid min-w-0">

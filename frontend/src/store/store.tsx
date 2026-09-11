@@ -8,7 +8,7 @@ interface User {
     username: string
     name: string,
     email: string,
-    avatarURL: string,
+    avatarUrl: string,
     createdAt: string,
     updatedAt: string
 
