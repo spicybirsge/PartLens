@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "@/components/ui/toast";
 import PageLoading from "@/components/PageLoading";
@@ -11,10 +11,10 @@ import { userStore } from '@/store/store';
 
 
 
-export default function Page() {
+function CallbackPage() {
 
     const router = useRouter()
-    const { user, loaded, checkIfLoggedIn } = userStore();
+    const { checkIfLoggedIn } = userStore();
 
 
 
@@ -87,8 +87,15 @@ export default function Page() {
         }
 
         obtainSession();
-    }, [callbackCode]);
+    }, [callbackCode, checkIfLoggedIn, router]);
 
     return <PageLoading></PageLoading>;
 }
 
+export default function Page() {
+    return (
+        <Suspense fallback={<PageLoading />}>
+            <CallbackPage />
+        </Suspense>
+    );
+}
