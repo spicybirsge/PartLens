@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, timestamp, varchar, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, timestamp, varchar, uuid, integer } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const usersTable = pgTable("users", {
@@ -40,5 +40,18 @@ export const sessionTable = pgTable("sessions", {
 export const project = pgTable("projects", {
 
   id: uuid("id").primaryKey().default(sql`uuidv7()`),
+  publicId: varchar("public_id", {length: 21}).notNull(),
+  userId:uuid("user_id").notNull().references(() =>usersTable.id, {onDelete: "cascade"}),
+   name: varchar("name", { length: 255 }).notNull(),
+  description: varchar("description", { length: 1000 }),
+  glbFileUrl: varchar("glb_file_url", { length: 2048 }).notNull(),
+  unlisted: boolean("unlisted").notNull().default(true),
+  views: integer("views").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 
-});
+
+}, (table) => ({
+  userIdIdx: index("projects_user_id_idx").on(table.userId),
+  unlistedIdx: index("projects_unlisted_idx").on(table.unlisted)
+}));
