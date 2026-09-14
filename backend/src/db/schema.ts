@@ -37,7 +37,7 @@ export const sessionTable = pgTable("sessions", {
 }));
 
 
-export const project = pgTable("projects", {
+export const projectTable = pgTable("projects", {
 
   id: uuid("id").primaryKey().default(sql`uuidv7()`),
   publicId: varchar("public_id", {length: 21}).notNull(),
@@ -55,3 +55,10 @@ export const project = pgTable("projects", {
   userIdIdx: index("projects_user_id_idx").on(table.userId),
   unlistedIdx: index("projects_unlisted_idx").on(table.unlisted)
 }));
+
+
+export const partsTable = pgTable("parts", {
+   id: uuid("id").primaryKey().default(sql`uuidv7()`),
+   projectId: uuid("project_id").notNull().references(() =>projectTable.id, {onDelete: "cascade"}),
+   
+})
