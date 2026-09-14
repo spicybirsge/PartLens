@@ -100,7 +100,7 @@ router.get('/google/callback', async (req, res) => {
 
 
 router.post("/obtain-session", async (req, res) => {
-        const { callback_code } = req.body;
+        const { callback_code } = req.body || {};
 
         if (!callback_code) {
                 return res.status(400).json({ success: false, message: "invalid request", code: 400 })
