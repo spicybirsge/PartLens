@@ -3,7 +3,8 @@
 
 - [x] Auth
 - [x] Projects table
-- [ ] Implement create project end point
+- [x] Implement create project end point
+- [ ] Create a seperate views table to store project views
 - [ ] Implement `/projects` end point and send stats too for overview page
 - [ ] Fix dashboard update(remove machines from sidebar add search, consistent naming projects and remove machines wording 
 
