@@ -46,7 +46,7 @@ export const projectTable = pgTable("projects", {
   description: varchar("description", { length: 1000 }),
   glbFileUrl: varchar("glb_file_url", { length: 2048 }).notNull(),
   unlisted: boolean("unlisted").notNull().default(true),
-  views: integer("views").notNull(),
+ 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 
@@ -55,6 +55,8 @@ export const projectTable = pgTable("projects", {
   userIdIdx: index("projects_user_id_idx").on(table.userId),
   unlistedIdx: index("projects_unlisted_idx").on(table.unlisted)
 }));
+
+//create a seperate table for project Views with user ip  views: integer("views").notNull(),
 
 
 export const partsTable = pgTable("parts", {
