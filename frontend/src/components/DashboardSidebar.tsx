@@ -3,14 +3,11 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
-  BarChart3,
   BookOpen,
   ChevronUp,
-  FolderKanban,
   LayoutDashboard,
   LogOut,
   Search,
-  Settings,
   SlidersHorizontal,
 } from "lucide-react"
 import { useMemo, useState } from "react"
@@ -47,7 +44,6 @@ import {
 
 const navigation = [
   { label: "Overview", href: "/", icon: LayoutDashboard },
-  { label: "My machines", href: "/machines", icon: FolderKanban },
   { label: "Bookmarks", href: "/bookmarks", icon: BookOpen },
   { label: "Discover", href: "/search", icon: Search },
 ]
@@ -119,10 +115,6 @@ function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href="/account/settings" />}>
-          <Settings />
-          Account settings
-        </DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onClick={handleLogout}>
           <LogOut />
           Log out
@@ -164,16 +156,6 @@ function SidebarNavigation() {
         <SidebarGroupLabel>Manage</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                render={<Link href="/analytics" />}
-                isActive={pathname.startsWith("/analytics")}
-                tooltip="Analytics"
-              >
-                <BarChart3 />
-                <span>Analytics</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
                 render={<Link href="/settings" />}
@@ -220,7 +202,7 @@ export default function DashboardSidebar({
             <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
               <span className="font-semibold">PartLens</span>
               <span className="text-xs text-sidebar-foreground/65">
-                Machine workspace
+                Project workspace
               </span>
             </div>
           </div>
