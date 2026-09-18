@@ -3,7 +3,7 @@ const router = express.Router()
 import verifySession from "../../middleware/verifySession.js"
 import { nanoid } from "nanoid"
 import { validate } from '../../middleware/validate.js';
-import { createProjectValidator } from "../../validator/project.validator.js";
+import { createProjectValidator } from "../../validators/project.validator.js";
 import { projectTable } from "../../db/schema.js";
 import { database } from "../../db/index.js";
 
