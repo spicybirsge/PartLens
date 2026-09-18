@@ -9,6 +9,7 @@ import {
   LogOut,
   Search,
   SlidersHorizontal,
+  Settings
 } from "lucide-react"
 import { useMemo, useState } from "react"
 
@@ -162,7 +163,7 @@ function SidebarNavigation() {
                 isActive={pathname.startsWith("/settings")}
                 tooltip="Settings"
               >
-                <SlidersHorizontal />
+                <Settings />
                 <span>Settings</span>
               </SidebarMenuButton>
             </SidebarMenuItem>

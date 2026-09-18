@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Box, Plus, Search, UploadCloud } from "lucide-react"
-
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -81,6 +81,7 @@ export default function DashboardHome() {
   const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
+    document.title = "Partlens | Overview"
     const fetchProjects = async () => {
       const token = localStorage.getItem("token")
       if (!token) return
@@ -130,7 +131,7 @@ export default function DashboardHome() {
             <div>
               <p className="text-sm text-muted-foreground">Workspace overview</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-                Good morning, {user?.name?.split(" ")[0] || "there"}
+                Hello, {user?.name?.split(" ")[0] || "there"}
               </h1>
             </div>
           </div>
@@ -150,7 +151,7 @@ export default function DashboardHome() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-muted-foreground">
-                Your project documentation library
+                Created using your account
               </CardContent>
             </Card>
             <Card>
@@ -172,24 +173,25 @@ export default function DashboardHome() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-muted-foreground">
-                Public and shared project views
+                Across all your projects
               </CardContent>
             </Card>
           </section>
         )}
 
         <div className="flex justify-center py-8">
+          <Link href={"/new"}>
           <Button size="lg">
             <Plus />
             Create new project
-          </Button>
+          </Button></Link>
         </div>
 
         <div className="mt-10 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">Your projects</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage your projects and their documentation.
+              Manage a project by clicking on it.
             </p>
           </div>
           <div className="relative hidden sm:block">
@@ -225,10 +227,11 @@ export default function DashboardHome() {
         ) : (
           <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredProjects.map((project) => (
+              <Link href={`/manage/${project.publicId}`} key={project.id}>            
               <Card
-                key={project.id}
+                
                 className="cursor-pointer transition-shadow hover:shadow-md"
-                onClick={() => router.push(`/manage/${project.publicId}`)}
+                
               >
                 <CardHeader>
                   <div className="flex items-start justify-between gap-3">
@@ -263,6 +266,8 @@ export default function DashboardHome() {
                   )}
                 </CardContent>
               </Card>
+              </Link>
+ 
             ))}
           </section>
         )}

@@ -5,8 +5,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toast"
 import { TooltipProvider } from "@/components/ui/tooltip"
 export const metadata: Metadata = {
-  title: "Your App",
-  description: "...",
+  title: "Partlens",
+  description: "Partlens - Interactive 3D documentation system",
 }
 
 export default function RootLayout({
