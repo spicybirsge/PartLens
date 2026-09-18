@@ -1,5 +1,5 @@
 import express from "express"
-import { count, eq, inArray } from "drizzle-orm";
+import { count, eq, inArray, desc } from "drizzle-orm";
 import { database } from "../../db/index.js";
 import { partsTable, projectTable, projectViewsTable } from "../../db/schema.js";
 import verifySession from "../../middleware/verifySession.js";
@@ -19,7 +19,7 @@ router.get('/projects', verifySession, async (req, res) => {
                         updatedAt: projectTable.updatedAt,
                 })
                 .from(projectTable)
-                .where(eq(projectTable.userId, req.user!.id));
+                .where(eq(projectTable.userId, req.user!.id)).orderBy(desc(projectTable.updatedAt));
 
         const projectIds = projects.map((project) => project.id);
         const [partsByProject, viewsByProject] = projectIds.length === 0
@@ -97,21 +97,21 @@ router.get('/project/:publicId', async (req, res) => {
 
         const ip = req.ip || "unknown";
 
-     
+
 
         const [viewCount] = await database
                 .select({ views: count() })
                 .from(projectViewsTable)
                 .where(eq(projectViewsTable.projectId, project.id));
 
-         res.status(200).json({
+        res.status(200).json({
                 success: true,
                 message: "Project retrieved",
                 data: { ...project, views: Number(viewCount.views) },
                 code: 200,
         });
 
-           await database
+        await database
                 .insert(projectViewsTable)
                 .values({ projectId: project.id, ip, viewedAt: new Date() })
                 .onConflictDoUpdate({
@@ -119,7 +119,7 @@ router.get('/project/:publicId', async (req, res) => {
                         set: { viewedAt: new Date() },
                 });
 
-                return;
+        return;
 });
 
 
