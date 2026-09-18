@@ -2,13 +2,13 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import GoogleIcon from './icons/flat-color-icons-google';
+import GoogleIcon from '../icons/flat-color-icons-google';
 import { useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 import { userStore } from '@/store/store';
 import { useRouter } from 'next/navigation';
-import PageLoading from './PageLoading';
+import PageLoading from '../PageLoading';
 import vars from '@/vars/vars';
 export default function LoginPage() {
 

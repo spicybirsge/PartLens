@@ -81,7 +81,7 @@ export default function DashboardHome() {
   const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
-    document.title = "Partlens | Overview"
+    document.title = "Overview | PartLens"
     const fetchProjects = async () => {
       const token = localStorage.getItem("token")
       if (!token) return
