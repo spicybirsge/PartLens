@@ -10,6 +10,7 @@ import createRoutes from "./routes/v1/create.js"
 import deleteRoutes from "./routes/v1/delete.js"
 import readRoutes from "./routes/v1/read.js"
 import updateRoutes from "./routes/v1/update.js"
+import uploadRoutes from "./routes/v1/upload.js"
 
 
 
@@ -42,6 +43,7 @@ app.use('/api/v1/create', createRoutes);
 app.use('/api/v1/delete', deleteRoutes);
 app.use('/api/v1/read', readRoutes);
 app.use('/api/v1/update', updateRoutes);
+app.use('/api/v1/upload', uploadRoutes);
 
 
 
@@ -101,7 +103,6 @@ const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => {
     console.log(`[^] Server is running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
 })
-
 
 
 

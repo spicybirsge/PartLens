@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, timestamp, varchar, uuid, integer } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, timestamp, varchar, uuid, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const usersTable = pgTable("users", {
@@ -56,7 +56,17 @@ export const projectTable = pgTable("projects", {
   unlistedIdx: index("projects_unlisted_idx").on(table.unlisted)
 }));
 
-//create a seperate table for project Views with user ip  views: integer("views").notNull(),
+export const projectViewsTable = pgTable("project_views", {
+  id: uuid("id").primaryKey().default(sql`uuidv7()`),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projectTable.id, { onDelete: "cascade" }),
+  ip: varchar("ip", { length: 45 }).notNull(),
+  viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  projectIdIdx: index("project_views_project_id_idx").on(table.projectId),
+  projectIpUnique: uniqueIndex("project_views_project_id_ip_unique").on(table.projectId, table.ip),
+}));
 
 
 export const partsTable = pgTable("parts", {

@@ -54,3 +54,50 @@ export const createProjectValidator = [
   body('unlisted')
     .isBoolean().withMessage('unlisted must be a boolean'),
 ];
+
+export const updateProjectValidator = [
+  body().custom((value) => {
+    if (!value || typeof value !== 'object' || Object.keys(value).length === 0) {
+      throw new Error('at least one project field is required');
+    }
+
+    const allowedFields = ['name', 'description', 'file_url', 'unlisted'];
+    if (Object.keys(value).some((field) => !allowedFields.includes(field))) {
+      throw new Error('request contains an unsupported project field');
+    }
+
+    return true;
+  }),
+
+  body('name')
+    .optional()
+    .isString().withMessage('name must be a string')
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 255 }).withMessage('name must be between 1 and 255 characters'),
+
+  body('description')
+    .optional({ values: 'null' })
+    .isString().withMessage('description must be a string')
+    .bail()
+    .trim()
+    .isLength({ max: 1000 }).withMessage('description must be at most 1000 characters'),
+
+  body('file_url')
+    .optional()
+    .isString().withMessage('file_url must be a string')
+    .bail()
+    .isLength({ max: 2048 }).withMessage('file_url must be at most 2048 characters')
+    .bail()
+    .custom((value) => {
+      const base = process.env.IMAGEKIT_URL_ENDPOINT;
+      if (!base || !value.startsWith(base) || !value.toLowerCase().endsWith('.glb')) {
+        throw new Error('invalid file_url');
+      }
+      return true;
+    }),
+
+  body('unlisted')
+    .optional()
+    .isBoolean().withMessage('unlisted must be a boolean'),
+];
