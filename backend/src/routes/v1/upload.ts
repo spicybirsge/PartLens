@@ -7,6 +7,7 @@ import verifySession from "../../middleware/verifySession.js";
 
 const router = express.Router();
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const UPLOAD_TIMEOUT_MS = 30_000;
 
 type UploadKind = "glb" | "pdf" | "image";
 
@@ -22,13 +23,31 @@ const allowedMimeTypes: Record<UploadKind, Set<string>> = {
   image: new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]),
 };
 
+// Applies a request timeout so a stuck upload (bad stream handling, slow
+// client, etc.) can't hang a connection open indefinitely.
+const withUploadTimeout: RequestHandler = (req, res, next) => {
+  req.setTimeout(UPLOAD_TIMEOUT_MS, () => {
+    if (!res.headersSent) {
+      res.status(408).json({
+        success: false,
+        message: "Upload timed out",
+        code: 408,
+      });
+    }
+    req.destroy();
+  });
+  next();
+};
+
 const createUploadMiddleware = (kind: UploadKind) => multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE, files: 1 },
   fileFilter: (_req, file, callback) => {
     const extension = path.extname(file.originalname).toLowerCase();
-    if (!allowedExtensions[kind].has(extension) || !allowedMimeTypes[kind].has(file.mimetype)) {
-      callback(new MulterError("LIMIT_UNEXPECTED_FILE", "file"));
+    const isValid = allowedExtensions[kind].has(extension) && allowedMimeTypes[kind].has(file.mimetype);
+
+    if (!isValid) {
+      callback(null, false);
       return;
     }
     callback(null, true);
@@ -39,8 +58,7 @@ const uploadToImageKit = (kind: UploadKind): RequestHandler => async (req, res) 
   if (!req.file) {
     return res.status(400).json({
       success: false,
-      message: "A file is required in the file field",
-      
+      message: "A valid file is required in the file field",
       code: 400,
     });
   }
@@ -52,7 +70,6 @@ const uploadToImageKit = (kind: UploadKind): RequestHandler => async (req, res) 
       return res.status(500).json({
         success: false,
         message: "File upload is not configured",
-      
         code: 500,
       });
     }
@@ -77,7 +94,6 @@ const uploadToImageKit = (kind: UploadKind): RequestHandler => async (req, res) 
     return res.status(502).json({
       success: false,
       message: "File upload failed",
-     
       code: 502,
     });
   }
@@ -91,15 +107,14 @@ const handleUploadError: ErrorRequestHandler = (error, _req, res, next) => {
       message: isTooLarge
         ? "File exceeds the 25 MB upload limit"
         : "Invalid file type. Upload the expected file type in the file field",
-      
       code: isTooLarge ? 413 : 400,
     });
   }
   return next(error);
 };
 
-router.post("/glb", verifySession, createUploadMiddleware("glb"), handleUploadError, uploadToImageKit("glb"));
-router.post("/pdf", verifySession, createUploadMiddleware("pdf"), handleUploadError, uploadToImageKit("pdf"));
-router.post("/image", verifySession, createUploadMiddleware("image"), handleUploadError, uploadToImageKit("image"));
+router.post("/glb", verifySession, withUploadTimeout, createUploadMiddleware("glb"), handleUploadError, uploadToImageKit("glb"));
+router.post("/pdf", verifySession, withUploadTimeout, createUploadMiddleware("pdf"), handleUploadError, uploadToImageKit("pdf"));
+router.post("/image", verifySession, withUploadTimeout, createUploadMiddleware("image"), handleUploadError, uploadToImageKit("image"));
 
 export default router;
