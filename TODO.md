@@ -7,7 +7,8 @@
 - [x] Create a seperate views table to store project views
 - [x] Create, delete, update, read endpoints for project done
 - [x] Implement `/projects` end point and send stats too for overview page
-- [ ] Fix dashboard update(remove machines from sidebar add search, consistent naming projects and remove machines wording 
+- [x] Fix dashboard update(remove machines from sidebar add search, consistent naming projects and remove machines wording 
+- [ ] Create the /new page where you create new projects in frontend
 
 
 Notes:
