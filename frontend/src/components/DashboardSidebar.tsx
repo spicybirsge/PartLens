@@ -27,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Separator } from "@/components/ui/separator"
 import {
   Sidebar,
   SidebarContent,
@@ -218,6 +219,10 @@ export default function DashboardSidebar({
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
+      <Separator
+        orientation="vertical"
+        className="hidden self-stretch bg-sidebar-border md:block"
+      />
       {children}
     </SidebarProvider>
   )
