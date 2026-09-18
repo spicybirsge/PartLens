@@ -40,7 +40,7 @@ export const sessionTable = pgTable("sessions", {
 export const projectTable = pgTable("projects", {
 
   id: uuid("id").primaryKey().default(sql`uuidv7()`),
-  publicId: varchar("public_id", { length: 21 }).notNull(),
+  publicId: varchar("public_id", { length: 21 }).notNull().unique(),
   userId: uuid("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   description: varchar("description", { length: 1000 }),

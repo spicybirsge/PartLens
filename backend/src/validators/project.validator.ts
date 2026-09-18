@@ -91,10 +91,30 @@ export const updateProjectValidator = [
     .bail()
     .custom((value) => {
       const base = process.env.IMAGEKIT_URL_ENDPOINT;
-      if (!base || !value.startsWith(base) || !value.toLowerCase().endsWith('.glb')) {
+      if (!base) {
+        throw new Error('file_url could not be validated');
+      }
+      if (!value.startsWith(base) || !value.endsWith('.glb')) {
         throw new Error('invalid file_url');
       }
       return true;
+    })
+    .bail()
+    .custom(async (value) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const response = await fetch(value, { method: 'HEAD', signal: controller.signal });
+        if (!response.ok) {
+          throw new Error('invalid file_url');
+        }
+        return true;
+      } catch {
+        throw new Error('invalid file_url');
+      } finally {
+        clearTimeout(timeout);
+      }
     }),
 
   body('unlisted')
