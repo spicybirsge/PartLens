@@ -227,21 +227,19 @@ export default function DashboardHome() {
         ) : (
           <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredProjects.map((project) => (
-              <Link href={`/manage/${project.publicId}`} key={project.id}>            
+              <Link href={`/manage/${project.publicId}`} key={project.id} className="block min-w-0">            
               <Card
-                
-                className="cursor-pointer transition-shadow hover:shadow-md"
-                
+                className="cursor-pointer transition-shadow hover:shadow-md min-w-0"
               >
-                <CardHeader>
+                <CardHeader className="min-w-0">
                   <div className="flex items-start justify-between gap-3">
                     <div
-                      className={`flex size-10 items-center justify-center rounded-lg ${getProjectColor(project.publicId)}`}
+                      className={`flex size-10 items-center justify-center rounded-lg shrink-0 ${getProjectColor(project.publicId)}`}
                     >
                       <Box className="size-5" />
                     </div>
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0 ${
                         project.unlisted
                           ? "bg-muted text-muted-foreground"
                           : "bg-emerald-500/10 text-emerald-600"
@@ -250,8 +248,10 @@ export default function DashboardHome() {
                       {project.unlisted ? "Unlisted" : "Public"}
                     </span>
                   </div>
-                  <CardTitle className="pt-2">{project.name}</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="pt-2 truncate" title={project.name}>
+                    {project.name}
+                  </CardTitle>
+                  <CardDescription className="truncate">
                     Updated {timeAgo(project.updatedAt)}
                   </CardDescription>
                 </CardHeader>
