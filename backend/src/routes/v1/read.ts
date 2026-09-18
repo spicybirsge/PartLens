@@ -1,9 +1,73 @@
 import express from "express"
-import { and, count, eq } from "drizzle-orm";
+import { count, eq, inArray } from "drizzle-orm";
 import { database } from "../../db/index.js";
-import { projectTable, projectViewsTable } from "../../db/schema.js";
+import { partsTable, projectTable, projectViewsTable } from "../../db/schema.js";
+import verifySession from "../../middleware/verifySession.js";
 
 const router = express.Router()
+
+router.get('/projects', verifySession, async (req, res) => {
+        const projects = await database
+                .select({
+                        id: projectTable.id,
+                        publicId: projectTable.publicId,
+                        name: projectTable.name,
+                        description: projectTable.description,
+                        glbFileUrl: projectTable.glbFileUrl,
+                        unlisted: projectTable.unlisted,
+                        createdAt: projectTable.createdAt,
+                        updatedAt: projectTable.updatedAt,
+                })
+                .from(projectTable)
+                .where(eq(projectTable.userId, req.user!.id));
+
+        const projectIds = projects.map((project) => project.id);
+        const [partsByProject, viewsByProject] = projectIds.length === 0
+                ? [[], []]
+                : await Promise.all([
+                        database
+                                .select({
+                                        projectId: partsTable.projectId,
+                                        count: count(),
+                                })
+                                .from(partsTable)
+                                .where(inArray(partsTable.projectId, projectIds))
+                                .groupBy(partsTable.projectId),
+                        database
+                                .select({
+                                        projectId: projectViewsTable.projectId,
+                                        count: count(),
+                                })
+                                .from(projectViewsTable)
+                                .where(inArray(projectViewsTable.projectId, projectIds))
+                                .groupBy(projectViewsTable.projectId),
+                ]);
+
+        const partsCounts = new Map(
+                partsByProject.map((row) => [row.projectId, Number(row.count)]),
+        );
+        const viewCounts = new Map(
+                viewsByProject.map((row) => [row.projectId, Number(row.count)]),
+        );
+
+        const data = projects.map((project) => ({
+                ...project,
+                parts: partsCounts.get(project.id) ?? 0,
+                views: viewCounts.get(project.id) ?? 0,
+        }));
+
+        return res.status(200).json({
+                success: true,
+                message: "Projects retrieved",
+                data,
+                stats: {
+                        total_projects: projects.length,
+                        total_parts: data.reduce((total, project) => total + project.parts, 0),
+                        total_views: data.reduce((total, project) => total + project.views, 0),
+                },
+                code: 200,
+        });
+});
 
 router.get('/project/:publicId', async (req, res) => {
         const { publicId } = req.params;
@@ -34,20 +98,7 @@ router.get('/project/:publicId', async (req, res) => {
         const ip = req.ip || "unknown";
       
 
-        const [viewCount] = await database
-                .select({ views: count() })
-                .from(projectViewsTable)
-                .where(eq(projectViewsTable.projectId, project.id));
-
-        res.status(200).json({
-                success: true,
-                message: "Project retrieved",
-                data: { ...project, views: Number(viewCount.views) },
-                code: 200,
-        });
-
-
-          await database
+        await database
                 .insert(projectViewsTable)
                 .values({ projectId: project.id, ip, viewedAt: new Date() })
                 .onConflictDoUpdate({
@@ -55,7 +106,17 @@ router.get('/project/:publicId', async (req, res) => {
                         set: { viewedAt: new Date() },
                 });
 
-                return;
+        const [viewCount] = await database
+                .select({ views: count() })
+                .from(projectViewsTable)
+                .where(eq(projectViewsTable.projectId, project.id));
+
+        return res.status(200).json({
+                success: true,
+                message: "Project retrieved",
+                data: { ...project, views: Number(viewCount.views) },
+                code: 200,
+        });
 });
 
 
