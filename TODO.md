@@ -10,4 +10,4 @@
 - [x] Create the /new page where you create new projects in frontend
 - [x] Update and manage project end points ui(frontend)
 - [ ] Other manage project endpoints
-- [ ] Delete files from CDN url when project deleted or updated including manuals.
+- [ ] Delete files from CDN when project deleted or updated including manuals.
