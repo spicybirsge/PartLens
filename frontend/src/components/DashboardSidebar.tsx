@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   LogOut,
   Search,
-  SlidersHorizontal,
   Settings
 } from "lucide-react"
 import { useMemo, useState } from "react"
@@ -198,9 +197,11 @@ export default function DashboardSidebar({
       <Sidebar collapsible="icon" variant="inset">
         <SidebarHeader>
           <div className="flex items-center gap-2 px-2 py-1">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <SlidersHorizontal className="size-4" />
-            </div>
+            <img
+              src="/logo_partlens.png"
+              alt="PartLens logo"
+              className="size-8 shrink-0 rounded-lg object-contain"
+            />
             <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
               <span className="font-semibold">PartLens</span>
               <span className="text-xs text-sidebar-foreground/65">
