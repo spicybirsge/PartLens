@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "New project | PartLens",
+  title: "New project",
   description:
     "Create a new PartLens project",
 };
