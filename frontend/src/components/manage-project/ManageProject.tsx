@@ -8,6 +8,7 @@ import PageLoading from "../PageLoading"
 import { SidebarTrigger } from "../ui/sidebar"
 import { Separator } from "../ui/separator"
 import { Button } from "../ui/button"
+import { Input } from "../ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { Skeleton } from "../ui/skeleton"
 import { toast } from "../ui/toast"
@@ -40,6 +41,11 @@ function getFieldErrors(name: string, description: string, file: File | null, ha
   return errors
 }
 
+function getDisplayProjectName(name: string) {
+  const trimmedName = name.trim()
+  return trimmedName.length > 80 ? `${trimmedName.slice(0, 77)}...` : trimmedName
+}
+
 export default function ManageProject({ id }: { id: string }) {
   const router = useRouter()
   const { user, loaded, checkIfLoggedIn } = userStore()
@@ -57,6 +63,9 @@ export default function ManageProject({ id }: { id: string }) {
   const [errors, setErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [deletePhrase, setDeletePhrase] = useState("")
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!loaded) checkIfLoggedIn()
@@ -95,6 +104,9 @@ export default function ManageProject({ id }: { id: string }) {
         setName(nextProject.name)
         setDescription(nextProject.description ?? "")
         setUnlisted(nextProject.unlisted)
+        document.title = nextProject.name.trim()
+          ? `Project Details — ${nextProject.name.trim()} | PartLens`
+          : "Project Details | PartLens"
       } catch (error) {
         if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : "Unable to load this project.")
       } finally {
@@ -195,6 +207,32 @@ export default function ManageProject({ id }: { id: string }) {
     }
   }
 
+  const handleDelete = async () => {
+    if (deletePhrase !== "DELETE PROJECT") return
+
+    const token = window.localStorage.getItem("token")
+    if (!token) {
+      setDeleteError("Your session has expired. Please sign in again.")
+      return
+    }
+
+    try {
+      setDeleting(true)
+      setDeleteError(null)
+      const response = await fetch(`${vars.BACKEND_URL}/api/v1/delete/project/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const payload = await readJsonResponse(response)
+      if (!response.ok) throw new Error(getApiErrorMessage(payload, "Unable to delete the project."))
+      toast.add({ type: "success", title: "Project deleted", description: "The project was permanently deleted." })
+      router.push("/")
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Unable to delete the project.")
+      setDeleting(false)
+    }
+  }
+
   if (!loaded || !user) return <PageLoading />
 
   return (
@@ -206,51 +244,86 @@ export default function ManageProject({ id }: { id: string }) {
             <div>
               <p className="text-sm text-muted-foreground">Manage your projects general details here</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">Project Details</h1>
+              {!loadingProject && project && (
+                <p className="mt-1 max-w-[min(32rem,70vw)] truncate text-sm font-medium text-foreground/80" title={project.name}>
+                  Editing: {getDisplayProjectName(project.name) || "Untitled project"}
+                </p>
+              )}
             </div>
           </div>
           <Separator className="my-6" />
           {loadingProject ? <ManageProjectSkeleton /> : loadError ? <FormError message={loadError} /> : (
-            <form className="grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]" onSubmit={handleSubmit} noValidate>
-              <Card className="self-start">
-                <CardHeader>
-                  <CardTitle>Project details</CardTitle>
-                  <CardDescription>Update the information shown for this project.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-5">
-                  <ProjectNameField value={name} error={errors.name} disabled={submitting} onChange={setName} onErrorChange={(error) => setErrors((current) => ({ ...current, name: error }))} />
-                  <ProjectDescriptionField value={description} error={errors.description} disabled={submitting} onChange={setDescription} onErrorChange={(error) => setErrors((current) => ({ ...current, description: error }))} />
-                  <ProjectVisibilityOptions unlisted={unlisted} disabled={submitting} onChange={setUnlisted} />
-                </CardContent>
-              </Card>
-              <div className="space-y-6">
-                <Card>
+            <>
+              <form className="grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]" onSubmit={handleSubmit} noValidate>
+                <Card className="self-start">
                   <CardHeader>
-                    <CardTitle>3D model</CardTitle>
-                    <CardDescription>Keep the current model or choose a replacement.</CardDescription>
+                    <CardTitle>Project details</CardTitle>
+                    <CardDescription>Update the information shown for this project.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    {project?.glbFileUrl && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Current model</p>
-                        {existingPreviewError ? <p className="text-sm text-muted-foreground">{existingPreviewError}</p> : <GlbPreview url={project.glbFileUrl} onError={setExistingPreviewError} />}
-                      </div>
-                    )}
-                    <div className="border-t pt-4">
-                      <p className="mb-3 text-sm font-medium">Replace model</p>
-                      <GlbFileField file={file} previewUrl={previewUrl} error={errors.file} previewError={previewError} disabled={submitting} inputRef={fileInputRef} onChange={handleFileChange} onRemove={removeFile} onPreviewError={setPreviewError} />
-                    </div>
+                  <CardContent className="space-y-5">
+                    <ProjectNameField value={name} error={errors.name} disabled={submitting} onChange={setName} onErrorChange={(error) => setErrors((current) => ({ ...current, name: error }))} />
+                    <ProjectDescriptionField value={description} error={errors.description} disabled={submitting} onChange={setDescription} onErrorChange={(error) => setErrors((current) => ({ ...current, description: error }))} />
+                    <ProjectVisibilityOptions unlisted={unlisted} disabled={submitting} onChange={setUnlisted} />
                   </CardContent>
                 </Card>
-                {formError && <FormError message={formError} />}
-                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                  <Button type="button" variant="outline" onClick={() => router.push("/")} disabled={submitting}>Cancel</Button>
-                  <Button type="submit" disabled={submitting}>
-                    {submitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
-                    {submitting ? "Saving changes…" : "Save changes"}
-                  </Button>
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>3D model</CardTitle>
+                      <CardDescription>Keep the current model or choose a replacement.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {project?.glbFileUrl && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium">Current model</p>
+                          {existingPreviewError ? <p className="text-sm text-muted-foreground">{existingPreviewError}</p> : <GlbPreview url={project.glbFileUrl} onError={setExistingPreviewError} />}
+                        </div>
+                      )}
+                      <div className="border-t pt-4">
+                        <p className="mb-3 text-sm font-medium">Replace model</p>
+                        <GlbFileField file={file} previewUrl={previewUrl} error={errors.file} previewError={previewError} disabled={submitting} inputRef={fileInputRef} onChange={handleFileChange} onRemove={removeFile} onPreviewError={setPreviewError} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  {formError && <FormError message={formError} />}
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="outline" onClick={() => router.push("/")} disabled={submitting}>Cancel</Button>
+                    <Button type="submit" disabled={submitting}>
+                      {submitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
+                      {submitting ? "Saving changes…" : "Save changes"}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </form>
+              </form>
+              <Card className="mt-6 max-w-5xl border-destructive/30">
+                <CardHeader>
+                  <CardTitle className="text-destructive">Delete project</CardTitle>
+                  <CardDescription>
+                    This permanently deletes <span className="font-medium text-foreground" title={project?.name}>{getDisplayProjectName(project?.name ?? "") || "this project"}</span> and its associated data. This action cannot be undone.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="delete-project-confirmation" className="text-sm font-medium">
+                      Type <span className="font-mono text-destructive">DELETE PROJECT</span> to confirm
+                    </label>
+                    <Input
+                      id="delete-project-confirmation"
+                      value={deletePhrase}
+                      onChange={(event) => setDeletePhrase(event.target.value)}
+                      placeholder="DELETE PROJECT"
+                      disabled={deleting}
+                      aria-invalid={Boolean(deleteError)}
+                    />
+                  </div>
+                  {deleteError && <FormError message={deleteError} />}
+                  <Button type="button" variant="destructive" onClick={handleDelete} disabled={deletePhrase !== "DELETE PROJECT" || deleting}>
+                    {deleting && <Loader2 className="animate-spin" />}
+                    {deleting ? "Deleting project…" : "Delete project permanently"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
       </main>
