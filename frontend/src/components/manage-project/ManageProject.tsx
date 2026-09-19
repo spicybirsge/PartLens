@@ -204,7 +204,7 @@ export default function ManageProject({ id }: { id: string }) {
           <div className="flex items-center gap-3">
             <SidebarTrigger variant="outline" size="icon" aria-label="Toggle navigation" />
             <div>
-              <p className="text-sm text-muted-foreground">Manage your project details here</p>
+              <p className="text-sm text-muted-foreground">Manage your projects general details here</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">Project Details</h1>
             </div>
           </div>
