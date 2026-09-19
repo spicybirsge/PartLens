@@ -1,5 +1,5 @@
 import express from "express"
-import { count, eq, inArray, desc } from "drizzle-orm";
+import { and, count, eq, inArray, desc } from "drizzle-orm";
 import { database } from "../../db/index.js";
 import { partsTable, projectTable, projectViewsTable } from "../../db/schema.js";
 import verifySession from "../../middleware/verifySession.js";
@@ -69,6 +69,43 @@ router.get('/projects', verifySession, async (req, res) => {
         });
 });
 
+router.get('/project/:publicId/details', verifySession, async (req, res) => {
+        const { publicId } = req.params;
+        if (typeof publicId !== "string") {
+                return res.status(400).json({
+                        success: false,
+                        message: "Invalid project identifier",
+                        data: null,
+                        code: 400,
+                });
+        }
+
+        const [project] = await database
+                .select()
+                .from(projectTable)
+                .where(and(
+                        eq(projectTable.publicId, publicId),
+                        eq(projectTable.userId, req.user!.id),
+                ))
+                .limit(1);
+
+        if (!project) {
+                return res.status(404).json({
+                        success: false,
+                        message: "Project not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        return res.status(200).json({
+                success: true,
+                message: "Project details retrieved",
+                data: project,
+                code: 200,
+        });
+});
+
 router.get('/project/:publicId', async (req, res) => {
         const { publicId } = req.params;
         if (typeof publicId !== "string") {
@@ -121,6 +158,8 @@ router.get('/project/:publicId', async (req, res) => {
 
         return;
 });
+
+
 
 
 export default router
