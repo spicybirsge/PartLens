@@ -1,7 +1,7 @@
 import express from "express"
 import { and, count, eq, inArray, desc } from "drizzle-orm";
 import { database } from "../../db/index.js";
-import { partsTable, projectTable, projectViewsTable } from "../../db/schema.js";
+import { partsTable, partManualsTable, projectTable, projectViewsTable, usersTable } from "../../db/schema.js";
 import verifySession from "../../middleware/verifySession.js";
 
 const router = express.Router()
@@ -117,13 +117,26 @@ router.get('/project/:publicId', async (req, res) => {
                 });
         }
 
-        const [project] = await database
-                .select()
+        const projectRows = await database
+                .select({
+                        project: projectTable,
+                        owner: {
+                                id: usersTable.id,
+                                username: usersTable.username,
+                                name: usersTable.name,
+                                avatarUrl: usersTable.avatarUrl,
+                                createdAt: usersTable.createdAt,
+                        },
+                        part: partsTable,
+                        manual: partManualsTable,
+                })
                 .from(projectTable)
-                .where(eq(projectTable.publicId, publicId))
-                .limit(1);
+                .innerJoin(usersTable, eq(projectTable.userId, usersTable.id))
+                .leftJoin(partsTable, eq(partsTable.projectId, projectTable.id))
+                .leftJoin(partManualsTable, eq(partManualsTable.partId, partsTable.id))
+                .where(eq(projectTable.publicId, publicId));
 
-        if (!project) {
+        if (projectRows.length === 0) {
                 return res.status(404).json({
                         success: false,
                         message: "Project not found",
@@ -132,19 +145,46 @@ router.get('/project/:publicId', async (req, res) => {
                 });
         }
 
+        const project = projectRows[0].project;
         const ip = req.ip || "unknown";
-
-
 
         const [viewCount] = await database
                 .select({ views: count() })
                 .from(projectViewsTable)
                 .where(eq(projectViewsTable.projectId, project.id));
 
+        const parts = new Map<string, NonNullable<typeof projectRows[number]["part"]>>();
+        const manualsByPart = new Map<string, NonNullable<typeof projectRows[number]["manual"]>[]>();
+
+        for (const row of projectRows) {
+                if (!row.part) {
+                        continue;
+                }
+
+                if (!parts.has(row.part.id)) {
+                        parts.set(row.part.id, row.part);
+                        manualsByPart.set(row.part.id, []);
+                }
+
+                if (row.manual) {
+                        manualsByPart.get(row.part.id)!.push(row.manual);
+                }
+        }
+
+        const data = {
+                ...project,
+                owner: projectRows[0].owner,
+                views: Number(viewCount.views),
+                parts: Array.from(parts.values()).map((part) => ({
+                        ...part,
+                        manuals: manualsByPart.get(part.id) ?? [],
+                })),
+        };
+
         res.status(200).json({
                 success: true,
                 message: "Project retrieved",
-                data: { ...project, views: Number(viewCount.views) },
+                data,
                 code: 200,
         });
 
