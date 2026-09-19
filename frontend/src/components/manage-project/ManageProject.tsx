@@ -255,18 +255,48 @@ export default function ManageProject({ id }: { id: string }) {
           {loadingProject ? <ManageProjectSkeleton /> : loadError ? <FormError message={loadError} /> : (
             <>
               <form className="grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]" onSubmit={handleSubmit} noValidate>
-                <Card className="self-start">
-                  <CardHeader>
-                    <CardTitle>Project details</CardTitle>
-                    <CardDescription>Update the information shown for this project.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-5">
-                    <ProjectNameField value={name} error={errors.name} disabled={submitting} onChange={setName} onErrorChange={(error) => setErrors((current) => ({ ...current, name: error }))} />
-                    <ProjectDescriptionField value={description} error={errors.description} disabled={submitting} onChange={setDescription} onErrorChange={(error) => setErrors((current) => ({ ...current, description: error }))} />
-                    <ProjectVisibilityOptions unlisted={unlisted} disabled={submitting} onChange={setUnlisted} />
-                  </CardContent>
-                </Card>
-                <div className="space-y-6">
+                <div className="contents lg:col-start-1 lg:row-start-1 lg:block">
+                  <Card className="order-1 self-start">
+                    <CardHeader>
+                      <CardTitle>Project details</CardTitle>
+                      <CardDescription>Update the information shown for this project.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      <ProjectNameField value={name} error={errors.name} disabled={submitting} onChange={setName} onErrorChange={(error) => setErrors((current) => ({ ...current, name: error }))} />
+                      <ProjectDescriptionField value={description} error={errors.description} disabled={submitting} onChange={setDescription} onErrorChange={(error) => setErrors((current) => ({ ...current, description: error }))} />
+                      <ProjectVisibilityOptions unlisted={unlisted} disabled={submitting} onChange={setUnlisted} />
+                    </CardContent>
+                  </Card>
+                  <Card className="order-3 mt-6 border-destructive/30">
+                    <CardHeader>
+                      <CardTitle className="text-destructive">Delete project</CardTitle>
+                      <CardDescription>
+                        This permanently deletes <span className="font-medium text-foreground" title={project?.name}>{getDisplayProjectName(project?.name ?? "") || "this project"}</span> and its associated data. This action cannot be undone.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <label htmlFor="delete-project-confirmation" className="text-sm font-medium">
+                          Type <span className="font-mono text-destructive">DELETE PROJECT</span> to confirm
+                        </label>
+                        <Input
+                          id="delete-project-confirmation"
+                          value={deletePhrase}
+                          onChange={(event) => setDeletePhrase(event.target.value)}
+                          placeholder="DELETE PROJECT"
+                          disabled={deleting}
+                          aria-invalid={Boolean(deleteError)}
+                        />
+                      </div>
+                      {deleteError && <FormError message={deleteError} />}
+                      <Button type="button" variant="destructive" onClick={handleDelete} disabled={deletePhrase !== "DELETE PROJECT" || deleting}>
+                        {deleting && <Loader2 className="animate-spin" />}
+                        {deleting ? "Deleting project…" : "Delete project permanently"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="order-2 space-y-6 lg:col-start-2 lg:row-start-1">
                   <Card>
                     <CardHeader>
                       <CardTitle>3D model</CardTitle>
@@ -295,34 +325,6 @@ export default function ManageProject({ id }: { id: string }) {
                   </div>
                 </div>
               </form>
-              <Card className="mt-6 max-w-5xl border-destructive/30">
-                <CardHeader>
-                  <CardTitle className="text-destructive">Delete project</CardTitle>
-                  <CardDescription>
-                    This permanently deletes <span className="font-medium text-foreground" title={project?.name}>{getDisplayProjectName(project?.name ?? "") || "this project"}</span> and its associated data. This action cannot be undone.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <label htmlFor="delete-project-confirmation" className="text-sm font-medium">
-                      Type <span className="font-mono text-destructive">DELETE PROJECT</span> to confirm
-                    </label>
-                    <Input
-                      id="delete-project-confirmation"
-                      value={deletePhrase}
-                      onChange={(event) => setDeletePhrase(event.target.value)}
-                      placeholder="DELETE PROJECT"
-                      disabled={deleting}
-                      aria-invalid={Boolean(deleteError)}
-                    />
-                  </div>
-                  {deleteError && <FormError message={deleteError} />}
-                  <Button type="button" variant="destructive" onClick={handleDelete} disabled={deletePhrase !== "DELETE PROJECT" || deleting}>
-                    {deleting && <Loader2 className="animate-spin" />}
-                    {deleting ? "Deleting project…" : "Delete project permanently"}
-                  </Button>
-                </CardContent>
-              </Card>
             </>
           )}
         </div>
