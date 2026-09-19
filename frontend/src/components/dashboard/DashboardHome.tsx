@@ -112,9 +112,11 @@ export default function DashboardHome() {
 
   const filteredProjects = useMemo(() => {
     if (!searchQuery.trim()) return projects
-    const query = searchQuery.toLowerCase()
-    return projects.filter((project) =>
-      project.name.toLowerCase().includes(query),
+    const query = searchQuery.trim().toLowerCase()
+    return projects.filter(
+      (project) =>
+        project.name.toLowerCase().includes(query) ||
+        project.description?.toLowerCase().includes(query) === true,
     )
   }, [projects, searchQuery])
 
