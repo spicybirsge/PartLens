@@ -41,11 +41,6 @@ function getFieldErrors(name: string, description: string, file: File | null, ha
   return errors
 }
 
-function getDisplayProjectName(name: string) {
-  const trimmedName = name.trim()
-  return trimmedName.length > 80 ? `${trimmedName.slice(0, 77)}...` : trimmedName
-}
-
 export default function ManageProject({ id }: { id: string }) {
   const router = useRouter()
   const { user, loaded, checkIfLoggedIn } = userStore()
@@ -246,7 +241,7 @@ export default function ManageProject({ id }: { id: string }) {
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">Project Details</h1>
               {!loadingProject && project && (
                 <p className="mt-1 max-w-[min(32rem,70vw)] truncate text-sm font-medium text-foreground/80" title={project.name}>
-                  Editing: {getDisplayProjectName(project.name) || "Untitled project"}
+                  Editing: {project.name.trim() || "Untitled project"}
                 </p>
               )}
             </div>
@@ -271,7 +266,7 @@ export default function ManageProject({ id }: { id: string }) {
                     <CardHeader>
                       <CardTitle className="text-destructive">Delete project</CardTitle>
                       <CardDescription>
-                        This permanently deletes <span className="font-medium text-foreground" title={project?.name}>{getDisplayProjectName(project?.name ?? "") || "this project"}</span> and its associated data. This action cannot be undone.
+                        This permanently deletes <span className="break-all font-medium text-foreground" title={project?.name}>{project?.name.trim() || "this project"}</span> and its associated data. This action cannot be undone.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -306,7 +301,15 @@ export default function ManageProject({ id }: { id: string }) {
                       {project?.glbFileUrl && (
                         <div className="space-y-2">
                           <p className="text-sm font-medium">Current model</p>
-                          {existingPreviewError ? <p className="text-sm text-muted-foreground">{existingPreviewError}</p> : <GlbPreview url={project.glbFileUrl} onError={setExistingPreviewError} />}
+                          {file ? (
+                            <div className="flex h-72 items-center justify-center rounded-lg border bg-muted/40 px-6 text-center text-sm text-muted-foreground sm:h-80">
+                              Selected file is being previewed. This preview is paused to prevent performance issues.
+                            </div>
+                          ) : existingPreviewError ? (
+                            <p className="text-sm text-muted-foreground">{existingPreviewError}</p>
+                          ) : (
+                            <GlbPreview url={project.glbFileUrl} onError={setExistingPreviewError} />
+                          )}
                         </div>
                       )}
                       <div className="border-t pt-4">
