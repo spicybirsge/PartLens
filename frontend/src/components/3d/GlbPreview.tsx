@@ -1,6 +1,6 @@
 "use client"
 
-import { Component, Suspense, useEffect, useMemo, type ReactNode } from "react"
+import { Component, memo, Suspense, useEffect, useMemo, type ReactNode } from "react"
 import { Canvas } from "@react-three/fiber"
 import { Bounds, OrbitControls, useGLTF } from "@react-three/drei"
 
@@ -37,7 +37,7 @@ interface GlbPreviewProps {
   onError: (message: string) => void
 }
 
-export default function GlbPreview({ url, onError }: GlbPreviewProps) {
+function GlbPreview({ url, onError }: GlbPreviewProps) {
   useEffect(() => {
     return () => useGLTF.clear(url)
   }, [url])
@@ -49,7 +49,7 @@ export default function GlbPreview({ url, onError }: GlbPreviewProps) {
         <directionalLight position={[5, 5, 5]} intensity={1.5} />
         <PreviewErrorBoundary onError={onError}>
           <Suspense fallback={null}>
-            <Bounds fit clip observe margin={1.35}>
+            <Bounds fit clip margin={1.35}>
               <PreviewModel url={url} />
             </Bounds>
           </Suspense>
@@ -59,3 +59,5 @@ export default function GlbPreview({ url, onError }: GlbPreviewProps) {
     </div>
   )
 }
+
+export default memo(GlbPreview)
