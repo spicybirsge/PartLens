@@ -206,7 +206,10 @@ export default function NewProject() {
     }
   }
 
-  if (!loaded || !user) return <PageLoading />
+  if (!loaded || !user) { 
+    return <PageLoading />
+
+}
 
   return (
     <DashboardSidebar>

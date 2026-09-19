@@ -3,10 +3,10 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BookOpen,
-  LayoutDashboard,
-  Search,
-  Settings
+  ArrowLeft,
+  BarChart3,
+  FileText,
+  InfoIcon
 } from "lucide-react"
 import { useState } from "react"
 
@@ -27,19 +27,34 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-const navigation = [
-  { label: "Overview", href: "/", icon: LayoutDashboard },
-  { label: "Bookmarks", href: "/bookmarks", icon: BookOpen },
-  { label: "Discover", href: "/search", icon: Search },
-]
-
-function SidebarNavigation() {
+function SidebarNavigation({ projectId }: { projectId: string }) {
   const pathname = usePathname()
+  const projectPath = `/manage/${projectId}`
+  const navigation = [
+    { label: "Details", href: projectPath, icon: InfoIcon },
+    { label: "Manuals", href: `${projectPath}/manuals`, icon: FileText },
+    { label: "Analytics", href: `${projectPath}/analytics`, icon: BarChart3 },
+  ]
 
   return (
     <SidebarContent>
       <SidebarGroup>
-        <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                render={<Link href="/" />}
+                tooltip="Back to projects"
+              >
+                <ArrowLeft />
+                <span>Back to projects</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+      <SidebarGroup>
+        <SidebarGroupLabel>Project</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {navigation.map((item) => (
@@ -47,8 +62,8 @@ function SidebarNavigation() {
                 <SidebarMenuButton
                   render={<Link href={item.href} />}
                   isActive={
-                    item.href === "/"
-                      ? pathname === "/"
+                    item.href === projectPath
+                      ? pathname === projectPath
                       : pathname.startsWith(item.href)
                   }
                   tooltip={item.label}
@@ -61,31 +76,16 @@ function SidebarNavigation() {
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
-      <SidebarGroup className="mt-auto">
-        <SidebarGroupLabel>Manage</SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                render={<Link href="/settings" />}
-                isActive={pathname.startsWith("/settings")}
-                tooltip="Settings"
-              >
-                <Settings />
-                <span>Settings</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
     </SidebarContent>
   )
 }
 
 export default function DashboardSidebar({
   children,
+  projectId,
 }: {
   children: React.ReactNode
+  projectId: string
 }) {
   const [open, setOpen] = useState(() => {
     if (typeof window === "undefined") return true
@@ -113,12 +113,12 @@ export default function DashboardSidebar({
             <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
               <span className="font-semibold">PartLens</span>
               <span className="text-xs text-sidebar-foreground/65">
-                Project workspace
+                Project management
               </span>
             </div>
           </div>
         </SidebarHeader>
-        <SidebarNavigation />
+        <SidebarNavigation projectId={projectId} />
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
