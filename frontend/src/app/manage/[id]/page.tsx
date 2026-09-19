@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Manage Project",
+  title: "Project Details",
   description:
     "Managing your PartLens project",
 };
