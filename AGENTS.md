@@ -942,18 +942,25 @@ For example:
 
 ```json
 {
-  "data": {}
+  "success":true,
+  "message":"anything relevant to the request",
+  "data":"data or any related field",
+  "code":200
 }
 ```
 
 for successful requests where a wrapper is useful, and a consistent error structure such as:
 
+
 ```json
 {
-  "error": {
-    "message": "Machine not found"
-  }
+  "success":false,
+  "message":"error",
+  "data":null,
+  "errors": ["error"]
+  "code":400
 }
+
 ```
 
 Do not introduce a complicated response abstraction unless the project actually needs it.
