@@ -317,7 +317,7 @@ export default function ManageProject({ id }: { id: string }) {
                   </Card>
                   {formError && <FormError message={formError} />}
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                    <Button type="button" variant="outline" onClick={() => router.push("/")} disabled={submitting}>Cancel</Button>
+                   
                     <Button type="submit" disabled={submitting}>
                       {submitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
                       {submitting ? "Saving changes…" : "Save changes"}
