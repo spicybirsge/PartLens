@@ -78,6 +78,7 @@ export default function ManageManuals({ id }: { id: string }) {
   const [editingPartId, setEditingPartId] = useState<string | null>(null)
   const [partSubmitting, setPartSubmitting] = useState(false)
   const [manualTitle, setManualTitle] = useState("")
+  const [manualTitleEdited, setManualTitleEdited] = useState(false)
   const [manualFile, setManualFile] = useState<File | null>(null)
   const [manualSubmitting, setManualSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -251,6 +252,7 @@ export default function ManageManuals({ id }: { id: string }) {
         ? { ...part, manuals: [data as Manual, ...part.manuals] }
         : part))
       setManualTitle("")
+      setManualTitleEdited(false)
       setManualFile(null)
       const input = document.getElementById("manual-file") as HTMLInputElement | null
       if (input) input.value = ""
@@ -259,6 +261,16 @@ export default function ManageManuals({ id }: { id: string }) {
       toast.add({ type: "error", title: "Unable to add manual", description: error instanceof Error ? error.message : "Please try again." })
     } finally {
       setManualSubmitting(false)
+    }
+
+  }
+
+  const handleManualFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    setManualFile(file)
+
+    if (file && !manualTitleEdited) {
+      setManualTitle(file.name.replace(/\.pdf$/i, ""))
     }
   }
 
@@ -370,8 +382,25 @@ export default function ManageManuals({ id }: { id: string }) {
                 <Card>
                   <CardHeader className="flex-row items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <CardTitle className="truncate">{selectedPart.name}</CardTitle>
-                      <CardDescription className="truncate">{selectedPart.partNumber}{selectedObjectName ? ` · GLB object: ${selectedObjectName}` : ""}</CardDescription>
+                      <CardTitle className="truncate uppercase">{selectedPart.name}</CardTitle>
+                      <CardDescription className="space-y-1">
+                        <span className="block">
+                          <span className="font-medium text-foreground">Part number:</span>{" "}
+                          <span className="font-mono">{selectedPart.partNumber}</span>
+                        </span>
+                        {selectedObjectName && (
+                          <span className="block">
+                            <span className="font-medium text-foreground">GLB object:</span>{" "}
+                            <span className="font-mono">{selectedObjectName}</span>
+                          </span>
+                        )}
+                        {selectedPart.description && (
+                          <span className="block">
+                            <span className="font-medium text-foreground">Description:</span>{" "}
+                            {selectedPart.description}
+                          </span>
+                        )}
+                      </CardDescription>
                     </div>
                     <div className="flex shrink-0 gap-2">
                       <Button type="button" variant="outline" size="sm" onClick={() => openPartForm(emptyPartForm, selectedPart)}><Save /> Edit</Button>
@@ -380,8 +409,17 @@ export default function ManageManuals({ id }: { id: string }) {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <form className="grid gap-3 rounded-lg border border-dashed p-4 sm:grid-cols-[1fr_1fr_auto]" onSubmit={uploadManual}>
-                      <Input value={manualTitle} onChange={(event) => setManualTitle(event.target.value)} placeholder="Manual title" aria-label="Manual title" required />
-                      <Input id="manual-file" type="file" accept=".pdf,application/pdf" onChange={(event) => setManualFile(event.target.files?.[0] ?? null)} required />
+                      <Input
+                        value={manualTitle}
+                        onChange={(event) => {
+                          setManualTitleEdited(true)
+                          setManualTitle(event.target.value)
+                        }}
+                        placeholder="Manual title"
+                        aria-label="Manual title"
+                        required
+                      />
+                      <Input id="manual-file" type="file" accept=".pdf,application/pdf" onChange={handleManualFileChange} required />
                       <Button type="submit" disabled={manualSubmitting || !manualFile || !manualTitle.trim()}>
                         {manualSubmitting ? <Loader2 className="animate-spin" /> : <UploadCloud />}
                         {manualSubmitting ? "Uploading…" : "Add manual"}
