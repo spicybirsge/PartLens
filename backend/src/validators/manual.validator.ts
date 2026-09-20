@@ -120,3 +120,13 @@ export const updatePartValidator = [
     .trim()
     .isLength({ max: 1000 }).withMessage("description must be at most 1000 characters"),
 ];
+
+export const deletePartValidator = [
+  param("partId")
+    .isUUID("all").withMessage("partId must be a valid UUID"),
+];
+
+export const deleteManualValidator = [
+  param("manualId")
+    .isUUID("all").withMessage("manualId must be a valid UUID"),
+];

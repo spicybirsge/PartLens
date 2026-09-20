@@ -1,5 +1,7 @@
 import express from "express"
 import verifySession from "../../middleware/verifySession.js";
+import { validate } from "../../middleware/validate.js";
+import { deleteManualValidator, deletePartValidator } from "../../validators/manual.validator.js";
 import { database } from "../../db/index.js";
 import { partManualsTable, partsTable, projectTable } from "../../db/schema.js";
 import { and, eq } from "drizzle-orm";
@@ -31,7 +33,7 @@ router.delete('/project/:publicId', verifySession, async (req, res) => {
   });
 });
 
-router.delete('/part/:partId', verifySession, async (req, res) => {
+router.delete('/part/:partId', verifySession, validate(deletePartValidator), async (req, res) => {
   const { partId } = req.params;
   if (typeof partId !== "string") {
     return res.status(400).json({
@@ -74,7 +76,7 @@ router.delete('/part/:partId', verifySession, async (req, res) => {
   });
 });
 
-router.delete('/manual/:manualId', verifySession, async (req, res) => {
+router.delete('/manual/:manualId', verifySession, validate(deleteManualValidator), async (req, res) => {
   const { manualId } = req.params;
   if (typeof manualId !== "string") {
     return res.status(400).json({
