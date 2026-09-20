@@ -2,8 +2,9 @@ import express from "express"
 import verifySession from "../../middleware/verifySession.js";
 import { validate } from "../../middleware/validate.js";
 import { updateProjectValidator } from "../../validators/project.validator.js";
+import { updatePartValidator } from "../../validators/manual.validator.js";
 import { database } from "../../db/index.js";
-import { projectTable } from "../../db/schema.js";
+import { partsTable, projectTable } from "../../db/schema.js";
 import { and, eq } from "drizzle-orm";
 
 const router = express.Router()
@@ -38,5 +39,58 @@ router.patch('/project/:publicId', verifySession, validate(updateProjectValidato
   return res.status(200).json({ success: true, message: "Project updated", data: project, code: 200 });
 });
 
+router.patch('/manual/:partId', verifySession, validate(updatePartValidator), async (req, res) => {
+  const { partId } = req.params;
+  if (typeof partId !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid part identifier",
+      data: null,
+      code: 400,
+    });
+  }
 
-export default router
+  const { part_number, name, description } = req.body;
+
+  const [part] = await database
+    .select({ id: partsTable.id })
+    .from(partsTable)
+    .innerJoin(projectTable, eq(partsTable.projectId, projectTable.id))
+    .where(and(
+      eq(partsTable.id, partId),
+      eq(projectTable.userId, req.user!.id),
+    ))
+    .limit(1);
+
+  if (!part) {
+    return res.status(404).json({
+      success: false,
+      message: "Part not found",
+      data: null,
+      code: 404,
+    });
+  }
+
+  const values: Partial<typeof partsTable.$inferInsert> = {
+    ...(part_number !== undefined && { partNumber: part_number }),
+    ...(name !== undefined && { name }),
+    ...(description !== undefined && { description }),
+    updatedAt: new Date(),
+  };
+
+  const [updatedPart] = await database
+    .update(partsTable)
+    .set(values)
+    .where(eq(partsTable.id, part.id))
+    .returning();
+
+  return res.status(200).json({
+    success: true,
+    message: "Part updated",
+    data: updatedPart,
+    code: 200,
+  });
+});
+
+
+export default router;

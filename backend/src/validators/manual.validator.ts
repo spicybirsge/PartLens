@@ -1,4 +1,4 @@
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 
 export const createManualValidator = [
   body("public_id")
@@ -80,4 +80,43 @@ export const createManualValidator = [
         clearTimeout(timeout);
       }
     }),
+];
+
+export const updatePartValidator = [
+  param("partId")
+    .isUUID("all").withMessage("partId must be a valid UUID"),
+
+  body().custom((value) => {
+    if (!value || typeof value !== "object" || Object.keys(value).length === 0) {
+      throw new Error("at least one part field is required");
+    }
+
+    const allowedFields = ["part_number", "name", "description"];
+    if (Object.keys(value).some((field) => !allowedFields.includes(field))) {
+      throw new Error("request contains an unsupported part field");
+    }
+
+    return true;
+  }),
+
+  body("part_number")
+    .optional()
+    .isString().withMessage("part_number must be a string")
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 255 }).withMessage("part_number must be between 1 and 255 characters"),
+
+  body("name")
+    .optional()
+    .isString().withMessage("name must be a string")
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 255 }).withMessage("name must be between 1 and 255 characters"),
+
+  body("description")
+    .optional({ values: "null" })
+    .isString().withMessage("description must be a string")
+    .bail()
+    .trim()
+    .isLength({ max: 1000 }).withMessage("description must be at most 1000 characters"),
 ];
