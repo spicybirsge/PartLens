@@ -106,7 +106,7 @@ router.get('/project/:publicId/details', verifySession, async (req, res) => {
         });
 });
 
-router.get('/project/:publicId/manuals', verifySession, async (req, res) => {
+router.get('/project/:publicId/parts', verifySession, async (req, res) => {
         const { publicId } = req.params;
         if (typeof publicId !== "string") {
                 return res.status(400).json({
