@@ -145,7 +145,8 @@ router.get('/project/:publicId/manuals', verifySession, async (req, res) => {
                 });
         }
 
-        const { id: projectId, ...project } = projectRecord;
+        const projectId = projectRecord.id;
+        const project = projectRecord;
 
         const rows = await database
                     .select({
