@@ -3,7 +3,7 @@
 > **Version:** 1.0.0  
 > **Base URL:** `http://localhost:5050/api/v1`  
 > **Protocol:** HTTPS (in production)  
-> **Authentication:** Bearer Token (JWT-style session tokens)  
+> **Authentication:** Bearer session tokens (opaque random tokens stored server-side; not JWTs)
 > **Database:** PostgreSQL via Drizzle ORM  
 > **Cache:** Redis  
 > **File Storage:** ImageKit
@@ -28,6 +28,9 @@
 ---
 
 ## Architecture Overview
+
+Session authentication uses opaque random bearer tokens stored server-side;
+these tokens are not JWTs.
 
 The backend is an **Express 5** server written in **TypeScript (ESM)** using the following stack:
 
@@ -124,6 +127,26 @@ POST /api/v1/auth/obtain-session
 ```
 
 > The returned `token` must be used as a **Bearer token** in the `Authorization` header for all subsequent requests.
+
+### Start Google OAuth
+
+```
+GET /api/v1/auth/google
+```
+
+No authentication is required. This endpoint creates a short-lived OAuth
+state in Redis and redirects the browser to Google's OAuth consent screen.
+
+### Google OAuth Callback
+
+```
+GET /api/v1/auth/google/callback?code=<google_code>&state=<oauth_state>
+```
+
+Google calls this endpoint after consent. On success, the backend creates a
+30-day session, stores a one-time callback code in Redis for 60 seconds, and
+redirects to `<FRONTEND_URL>/auth/callback?code=<callback_code>`. Missing or
+invalid `code` or `state` values return `400`.
 
 ### Get Current User
 
@@ -236,6 +259,10 @@ All authenticated routes use the `verifySession` middleware, which:
 
 ## Health Check
 
+The `ADMIN_KEY` is optional. The endpoint always returns basic health status;
+when `ADMIN_KEY` is configured and the matching bearer value is supplied, the
+response also includes per-service status in `services`.
+
 ```
 GET /status
 ```
@@ -268,13 +295,17 @@ GET /status
 }
 ```
 
-> Requires the `ADMIN_KEY` to be set. The admin token is sent via `Authorization: Bearer <ADMIN_KEY>`.
+> `ADMIN_KEY` is optional. Basic health status is available without it; when configured, the matching bearer token also includes the `services` object.
 
 ---
 
 ## Projects
 
-All project routes require authentication (`Authorization: Bearer <token>`).
+Project management routes require authentication. The public project route
+(`GET /api/v1/read/project/:publicId`) is the exception and does not require a
+session; it can read either listed or unlisted projects when the public ID is
+known.
+
 
 ### Create a Project
 
@@ -295,7 +326,7 @@ Content-Type: application/json
 | `name` | string | ✅ Yes | Project name (1–255 chars) |
 | `description` | string | No | Project description (max 1000 chars) |
 | `file_url` | string | ✅ Yes | ImageKit-hosted `.glb` URL |
-| `unlisted` | boolean | No | Visibility flag (default: `true`) |
+| `unlisted` | boolean | No | Visibility flag (defaults to `true` in the database) |
 
 **Validation:**
 - `file_url` must start with `IMAGEKIT_URL_ENDPOINT` and end with `.glb`
@@ -1006,7 +1037,7 @@ Catches unhandled errors and returns a generic 500 response.
 
 ### `createProjectValidator`
 
-Validates `POST /api/v1/create/project` request body: `name` (required, 1–255 chars), `description` (optional, max 1000), `file_url` (required, must be ImageKit `.glb` URL, must be reachable), `unlisted` (boolean).
+Validates `POST /api/v1/create/project` request body: `name` (required, 1–255 chars), `description` (optional, max 1000), `file_url` (required, must be an ImageKit `.glb` URL, must be reachable), and `unlisted` (optional boolean; the database default is `true`).
 
 ### `updateProjectValidator`
 

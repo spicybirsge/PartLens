@@ -54,6 +54,7 @@ export const createProjectValidator = [
     }),
 
   body('unlisted')
+    .optional()
     .isBoolean().withMessage('unlisted must be a boolean'),
 ];
 
