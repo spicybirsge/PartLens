@@ -272,7 +272,7 @@ export default function ManageProject({ id }: { id: string }) {
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
                         <label htmlFor="delete-project-confirmation" className="text-sm font-medium">
-                          Type <span className="font-mono text-destructive">DELETE PROJECT</span> to confirm
+                          Type <span className="font-mono text-destructive">"DELETE PROJECT"</span> in capital letters to confirm
                         </label>
                         <Input
                           id="delete-project-confirmation"
@@ -281,6 +281,7 @@ export default function ManageProject({ id }: { id: string }) {
                           placeholder="DELETE PROJECT"
                           disabled={deleting}
                           aria-invalid={Boolean(deleteError)}
+                          autoComplete="off"
                         />
                       </div>
                       {deleteError && <FormError message={deleteError} />}
