@@ -1,3 +1,5 @@
+//to whom it may concern this is project.validator.ts so any validations related to fetching projects or its related tables go in here.
+
 import { body } from 'express-validator';
 
 export const createProjectValidator = [
