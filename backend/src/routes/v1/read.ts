@@ -118,12 +118,16 @@ router.get('/project/:publicId/manuals', verifySession, async (req, res) => {
         }
 
      
-        const [project] = await database
+        const [projectRecord] = await database
                 .select({
                         id: projectTable.id,
                         publicId: projectTable.publicId,
                         name: projectTable.name,
+                        description: projectTable.description,
                         glbFileUrl: projectTable.glbFileUrl,
+                        unlisted: projectTable.unlisted,
+                        createdAt: projectTable.createdAt,
+                        updatedAt: projectTable.updatedAt,
                 })
                 .from(projectTable)
                 .where(and(
@@ -132,7 +136,7 @@ router.get('/project/:publicId/manuals', verifySession, async (req, res) => {
                 ))
                 .limit(1);
 
-        if (!project) {
+        if (!projectRecord) {
                 return res.status(404).json({
                         success: false,
                         message: "Project not found",
@@ -141,26 +145,62 @@ router.get('/project/:publicId/manuals', verifySession, async (req, res) => {
                 });
         }
 
-        // Fetch all manuals for this project (joined through parts)
-        const manuals = await database
-                .select({
-                        id: partManualsTable.id,
-                        partId: partManualsTable.partId,
-                        title: partManualsTable.title,
-                        fileUrl: partManualsTable.fileUrl,
-                        uploadedAt: partManualsTable.uploadedAt,
-                })
-                .from(partManualsTable)
-                .innerJoin(partsTable, eq(partManualsTable.partId, partsTable.id))
-                .where(eq(partsTable.projectId, project.id))
-                .orderBy(desc(partManualsTable.uploadedAt));
+        const { id: projectId, ...project } = projectRecord;
+
+        const rows = await database
+                    .select({
+                            part: {
+                                    id: partsTable.id,
+                                    partNumber: partsTable.partNumber,
+                                    name: partsTable.name,
+                                    description: partsTable.description,
+                                    createdAt: partsTable.createdAt,
+                                    updatedAt: partsTable.updatedAt,
+                            },
+                            manual: {
+                                    id: partManualsTable.id,
+                                    title: partManualsTable.title,
+                                    fileUrl: partManualsTable.fileUrl,
+                                    uploadedAt: partManualsTable.uploadedAt,
+                            },
+                    })
+                    .from(partManualsTable)
+                    .innerJoin(partsTable, eq(partManualsTable.partId, partsTable.id))
+                    .where(eq(partsTable.projectId, projectId))
+                    .orderBy(desc(partManualsTable.uploadedAt));
+
+        const parts = new Map<string, {
+                    id: string;
+                    partNumber: string;
+                    name: string;
+                    description: string | null;
+                    createdAt: Date;
+                    updatedAt: Date;
+                    manuals: Array<{
+                            id: string;
+                            title: string;
+                            fileUrl: string;
+                            uploadedAt: Date;
+                    }>;
+        }>();
+
+        for (const row of rows) {
+                    if (!parts.has(row.part.id)) {
+                            parts.set(row.part.id, {
+                                    ...row.part,
+                                    manuals: [],
+                            });
+                    }
+
+                    parts.get(row.part.id)!.manuals.push(row.manual);
+        }
 
         return res.status(200).json({
                 success: true,
                 message: "Project manuals retrieved",
                 data: {
-                        project,
-                        manuals,
+                            project,
+                            parts: Array.from(parts.values()),
                 },
                 code: 200,
         });
