@@ -29,7 +29,7 @@ export const createManualValidator = [
     .isLength({ max: 1000 }).withMessage("description must be at most 1000 characters"),
 
   body("file_urls")
-    .isArray({ min: 1 }).withMessage("file_urls must contain at least one URL")
+    .isArray().withMessage("file_urls must be an array")
     .bail()
     .custom((values) => values.every((value: unknown) => (
       typeof value === "object"
