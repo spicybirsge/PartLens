@@ -353,7 +353,9 @@ export default function ManageManuals({ id }: { id: string }) {
                     <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search part number or name" aria-label="Search parts" />
                     <div className="max-h-[29rem] space-y-2 overflow-y-auto pr-1">
                       {filteredParts.length === 0 ? (
-                        <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No parts match this search.</p>
+                        <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">
+                          {parts.length === 0 ? "This project has no parts yet." : "No parts match this search."}
+                        </p>
                       ) : filteredParts.map((part) => (
                         <button
                           key={part.id}
