@@ -82,6 +82,55 @@ export const createManualValidator = [
     }),
 ];
 
+export const createPartManualValidator = [
+  body("part_id")
+    .exists({ checkFalsy: true }).withMessage("part_id is required")
+    .bail()
+    .isUUID("all").withMessage("part_id must be a valid UUID"),
+
+  body("title")
+    .isString().withMessage("title must be a string")
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 255 }).withMessage("title must be between 1 and 255 characters"),
+
+  body("file_url")
+    .isString().withMessage("file_url must be a string")
+    .bail()
+    .isLength({ max: 2048 }).withMessage("file_url must be at most 2048 characters")
+    .bail()
+    .custom((value) => {
+      const base = process.env.IMAGEKIT_URL_ENDPOINT;
+      if (!base) {
+        throw new Error("file_url could not be validated");
+      }
+      if (!value.startsWith(base) || !value.toLowerCase().endsWith(".pdf")) {
+        throw new Error("file_url must be a valid ImageKit PDF URL");
+      }
+      return true;
+    })
+    .bail()
+    .custom(async (value) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const response = await fetch(value, { method: "HEAD", signal: controller.signal });
+        const contentType = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
+
+        if (!response.ok || contentType !== "application/pdf") {
+          throw new Error("file_url must point to a valid PDF");
+        }
+
+        return true;
+      } catch {
+        throw new Error("file_url must point to a reachable PDF");
+      } finally {
+        clearTimeout(timeout);
+      }
+    }),
+];
+
 export const updatePartValidator = [
   param("partId")
     .isUUID("all").withMessage("partId must be a valid UUID"),

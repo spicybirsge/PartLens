@@ -4,7 +4,7 @@ import verifySession from "../../middleware/verifySession.js"
 import { nanoid } from "nanoid"
 import { validate } from '../../middleware/validate.js';
 import { createProjectValidator } from "../../validators/project.validator.js";
-import { createManualValidator } from "../../validators/manual.validator.js";
+import { createManualValidator, createPartManualValidator } from "../../validators/manual.validator.js";
 import { partManualsTable, partsTable, projectTable } from "../../db/schema.js";
 import { database } from "../../db/index.js";
 import { and, eq } from "drizzle-orm";
@@ -103,6 +103,45 @@ router.post('/part', verifySession, validate(createManualValidator), async (req,
                 code: 201,
         });
 })
+
+router.post('/manual', verifySession, validate(createPartManualValidator), async (req, res) => {
+        const { part_id, title, file_url } = req.body;
+
+        const [part] = await database
+                .select({ id: partsTable.id })
+                .from(partsTable)
+                .innerJoin(projectTable, eq(partsTable.projectId, projectTable.id))
+                .where(and(
+                        eq(partsTable.id, part_id),
+                        eq(projectTable.userId, req.user!.id),
+                ))
+                .limit(1);
+
+        if (!part) {
+                return res.status(404).json({
+                        success: false,
+                        message: "Part not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        const [manual] = await database
+                .insert(partManualsTable)
+                .values({
+                        partId: part.id,
+                        title,
+                        fileUrl: file_url,
+                })
+                .returning();
+
+        return res.status(201).json({
+                success: true,
+                message: "Manual created successfully",
+                data: manual,
+                code: 201,
+        });
+});
 
 
 export default router;
