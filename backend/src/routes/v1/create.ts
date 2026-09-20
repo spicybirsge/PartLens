@@ -4,8 +4,10 @@ import verifySession from "../../middleware/verifySession.js"
 import { nanoid } from "nanoid"
 import { validate } from '../../middleware/validate.js';
 import { createProjectValidator } from "../../validators/project.validator.js";
-import { projectTable } from "../../db/schema.js";
+import { createManualValidator } from "../../validators/manual.validator.js";
+import { partManualsTable, partsTable, projectTable } from "../../db/schema.js";
 import { database } from "../../db/index.js";
+import { and, eq } from "drizzle-orm";
 
 router.post('/project', verifySession, validate(createProjectValidator), async (req, res) => {
 
@@ -35,5 +37,72 @@ router.post('/project', verifySession, validate(createProjectValidator), async (
 
 })
 
+router.post('/manual', verifySession, validate(createManualValidator), async (req, res) => {
+        const { public_id, name, part_number, description, file_urls } = req.body;
 
-export default router
+        const result = await database.transaction(async (tx) => {
+                const [project] = await tx
+                        .select({ id: projectTable.id, publicId: projectTable.publicId })
+                        .from(projectTable)
+                        .where(and(
+                                eq(projectTable.publicId, public_id),
+                                eq(projectTable.userId, req.user!.id),
+                        ))
+                        .limit(1);
+
+                if (!project) {
+                        return null;
+                }
+
+                let [part] = await tx
+                        .select()
+                        .from(partsTable)
+                        .where(and(
+                                eq(partsTable.projectId, project.id),
+                                eq(partsTable.partNumber, part_number),
+                        ))
+                        .limit(1);
+
+                if (!part) {
+                        [part] = await tx
+                                .insert(partsTable)
+                                .values({
+                                        projectId: project.id,
+                                        partNumber: part_number,
+                                        name,
+                                        description,
+                                })
+                                .returning();
+                }
+
+                const manuals = await tx
+                        .insert(partManualsTable)
+                        .values(file_urls.map(({ title, file_url }: { title: string; file_url: string }) => ({
+                                partId: part.id,
+                                title,
+                                fileUrl: file_url,
+                        })))
+                        .returning();
+
+                return { project, part, manuals };
+        });
+
+        if (!result) {
+                return res.status(404).json({
+                        success: false,
+                        message: "Project not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        return res.status(201).json({
+                success: true,
+                message: "Manual created successfully",
+                data: result,
+                code: 201,
+        });
+})
+
+
+export default router;
