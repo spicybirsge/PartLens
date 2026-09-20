@@ -106,6 +106,66 @@ router.get('/project/:publicId/details', verifySession, async (req, res) => {
         });
 });
 
+router.get('/project/:publicId/manuals', verifySession, async (req, res) => {
+        const { publicId } = req.params;
+        if (typeof publicId !== "string") {
+                return res.status(400).json({
+                        success: false,
+                        message: "Invalid project identifier",
+                        data: null,
+                        code: 400,
+                });
+        }
+
+     
+        const [project] = await database
+                .select({
+                        id: projectTable.id,
+                        publicId: projectTable.publicId,
+                        name: projectTable.name,
+                        glbFileUrl: projectTable.glbFileUrl,
+                })
+                .from(projectTable)
+                .where(and(
+                        eq(projectTable.publicId, publicId),
+                        eq(projectTable.userId, req.user!.id),
+                ))
+                .limit(1);
+
+        if (!project) {
+                return res.status(404).json({
+                        success: false,
+                        message: "Project not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        // Fetch all manuals for this project (joined through parts)
+        const manuals = await database
+                .select({
+                        id: partManualsTable.id,
+                        partId: partManualsTable.partId,
+                        title: partManualsTable.title,
+                        fileUrl: partManualsTable.fileUrl,
+                        uploadedAt: partManualsTable.uploadedAt,
+                })
+                .from(partManualsTable)
+                .innerJoin(partsTable, eq(partManualsTable.partId, partsTable.id))
+                .where(eq(partsTable.projectId, project.id))
+                .orderBy(desc(partManualsTable.uploadedAt));
+
+        return res.status(200).json({
+                success: true,
+                message: "Project manuals retrieved",
+                data: {
+                        project,
+                        manuals,
+                },
+                code: 200,
+        });
+});
+
 router.get('/project/:publicId', async (req, res) => {
         const { publicId } = req.params;
         if (typeof publicId !== "string") {
