@@ -2,7 +2,7 @@
 
 import { Component, Suspense, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Canvas, type ThreeEvent } from "@react-three/fiber"
-import { Bounds, Environment, Html, OrbitControls, useGLTF, useProgress } from "@react-three/drei"
+import { Environment, Html, OrbitControls, useGLTF, useProgress } from "@react-three/drei"
 import * as THREE from "three"
 
 type InteractiveGlbViewerProps = {
@@ -22,9 +22,29 @@ function InteractiveModel({
 }: Omit<InteractiveGlbViewerProps, "onError"> & { hoveredPartName: string | null }) {
   const { scene } = useGLTF(url)
   const model = useMemo(() => scene.clone(), [scene])
+  const framedModel = useMemo(() => {
+    const clone = model
+    const bounds = new THREE.Box3().setFromObject(clone)
+    const size = bounds.getSize(new THREE.Vector3())
+    const center = bounds.getCenter(new THREE.Vector3())
+    const largestDimension = Math.max(size.x, size.y, size.z)
+
+    if (
+      Number.isFinite(center.x)
+      && Number.isFinite(center.y)
+      && Number.isFinite(center.z)
+      && Number.isFinite(largestDimension)
+      && largestDimension > 0
+    ) {
+      clone.position.sub(center)
+      clone.scale.setScalar(3.5 / largestDimension)
+    }
+
+    return clone
+  }, [model])
 
   useEffect(() => {
-    model.traverse((object) => {
+    framedModel.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return
       const materials = Array.isArray(object.material) ? object.material : [object.material]
       const isSelected = Boolean(object.name && object.name === selectedPartName)
@@ -36,7 +56,7 @@ function InteractiveModel({
       }
 
     })
-  }, [model, selectedPartName, hoveredPartName])
+  }, [framedModel, selectedPartName, hoveredPartName])
 
   const handlePointerOver = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation()
@@ -56,7 +76,7 @@ function InteractiveModel({
 
   return (
     <primitive
-      object={model}
+      object={framedModel}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
       onClick={handleClick}
@@ -112,19 +132,17 @@ export default function InteractiveGlbViewer({
         <Environment preset="studio" />
         <ViewerErrorBoundary onError={onError}>
           <Suspense fallback={<ViewerLoading />}>
-            <Bounds fit margin={1.35}>
-              <InteractiveModel
-                url={url}
-                selectedPartName={selectedPartName}
-                hoveredPartName={hoveredPartName}
-                onPartClick={onPartClick}
-                onHoverChange={(name) => {
-                  setHovered(Boolean(name))
-                  setHoveredPartName(name)
-                  onHoverChange?.(name)
-                }}
-              />
-            </Bounds>
+            <InteractiveModel
+              url={url}
+              selectedPartName={selectedPartName}
+              hoveredPartName={hoveredPartName}
+              onPartClick={onPartClick}
+              onHoverChange={(name) => {
+                setHovered(Boolean(name))
+                setHoveredPartName(name)
+                onHoverChange?.(name)
+              }}
+            />
           </Suspense>
         </ViewerErrorBoundary>
         <OrbitControls enableDamping dampingFactor={0.08} />

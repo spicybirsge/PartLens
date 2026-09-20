@@ -128,7 +128,7 @@ export default function ManageManuals({ id }: { id: string }) {
   }, [parts, search])
 
   const findMatchingPart = (objectName: string) =>
-    parts.find((part) => part.partNumber === objectName || part.name === objectName) ?? null
+    parts.find((part) => part.partNumber === objectName) ?? null
 
   const handleObjectClick = (objectName: string) => {
     setSelectedObjectName(objectName)

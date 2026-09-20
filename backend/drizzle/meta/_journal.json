@@ -57,6 +57,13 @@
       "when": 1789712013450,
       "tag": "0007_remarkable_sister_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789930750249,
+      "tag": "0008_bent_rattler",
+      "breakpoints": true
     }
   ]
 }

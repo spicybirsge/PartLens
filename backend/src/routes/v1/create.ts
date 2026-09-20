@@ -54,7 +54,7 @@ router.post('/part', verifySession, validate(createManualValidator), async (req,
                         return null;
                 }
 
-                let [part] = await tx
+                const [existingPart] = await tx
                         .select()
                         .from(partsTable)
                         .where(and(
@@ -63,17 +63,19 @@ router.post('/part', verifySession, validate(createManualValidator), async (req,
                         ))
                         .limit(1);
 
-                if (!part) {
-                        [part] = await tx
-                                .insert(partsTable)
-                                .values({
-                                        projectId: project.id,
-                                        partNumber: part_number,
-                                        name,
-                                        description,
-                                })
-                                .returning();
+                if (existingPart) {
+                        return { conflict: true as const };
                 }
+
+                const [part] = await tx
+                        .insert(partsTable)
+                        .values({
+                                projectId: project.id,
+                                partNumber: part_number,
+                                name,
+                                description,
+                        })
+                        .returning();
 
                 const manuals = file_urls.length === 0
                         ? []
@@ -95,6 +97,15 @@ router.post('/part', verifySession, validate(createManualValidator), async (req,
                         message: "Project not found",
                         data: null,
                         code: 404,
+                });
+        }
+
+        if ("conflict" in result) {
+                return res.status(409).json({
+                        success: false,
+                        message: "A part with this part number already exists in the project",
+                        data: null,
+                        code: 409,
                 });
         }
 

@@ -80,7 +80,8 @@ export const partsTable = pgTable("parts", {
 
 }, (table) => ({
   projectIdIdx: index("parts_project_id_idx").on(table.projectId),
-}))
+  projectPartNumberUnique: uniqueIndex("parts_project_id_part_number_unique").on(table.projectId, table.partNumber),
+}));
 
 export const partManualsTable = pgTable("part_manuals", {
   id: uuid("id").primaryKey().default(sql`uuidv7()`),

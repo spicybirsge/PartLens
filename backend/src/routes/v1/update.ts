@@ -53,7 +53,7 @@ router.patch('/manual/:partId', verifySession, validate(updatePartValidator), as
   const { part_number, name, description } = req.body;
 
   const [part] = await database
-    .select({ id: partsTable.id })
+    .select({ id: partsTable.id, projectId: partsTable.projectId })
     .from(partsTable)
     .innerJoin(projectTable, eq(partsTable.projectId, projectTable.id))
     .where(and(
@@ -69,6 +69,26 @@ router.patch('/manual/:partId', verifySession, validate(updatePartValidator), as
       data: null,
       code: 404,
     });
+  }
+
+  if (part_number !== undefined) {
+    const [duplicate] = await database
+      .select({ id: partsTable.id })
+      .from(partsTable)
+      .where(and(
+        eq(partsTable.projectId, part.projectId),
+        eq(partsTable.partNumber, part_number),
+      ))
+      .limit(1);
+
+    if (duplicate && duplicate.id !== part.id) {
+      return res.status(409).json({
+        success: false,
+        message: "A part with this part number already exists in the project",
+        data: null,
+        code: 409,
+      });
+    }
   }
 
   const values: Partial<typeof partsTable.$inferInsert> = {

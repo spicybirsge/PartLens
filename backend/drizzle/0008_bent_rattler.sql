@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "parts_project_id_part_number_unique" ON "parts" USING btree ("project_id","part_number");
