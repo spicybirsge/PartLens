@@ -165,8 +165,8 @@ router.get('/project/:publicId/parts', verifySession, async (req, res) => {
                                     uploadedAt: partManualsTable.uploadedAt,
                             },
                     })
-                    .from(partManualsTable)
-                    .innerJoin(partsTable, eq(partManualsTable.partId, partsTable.id))
+                    .from(partsTable)
+                    .leftJoin(partManualsTable, eq(partManualsTable.partId, partsTable.id))
                     .where(eq(partsTable.projectId, projectId))
                     .orderBy(desc(partManualsTable.uploadedAt));
 
@@ -193,7 +193,9 @@ router.get('/project/:publicId/parts', verifySession, async (req, res) => {
                             });
                     }
 
-                    parts.get(row.part.id)!.manuals.push(row.manual);
+                    if (row.manual) {
+                            parts.get(row.part.id)!.manuals.push(row.manual);
+                    }
         }
 
         return res.status(200).json({

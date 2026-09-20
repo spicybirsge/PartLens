@@ -75,14 +75,16 @@ router.post('/part', verifySession, validate(createManualValidator), async (req,
                                 .returning();
                 }
 
-                const manuals = await tx
-                        .insert(partManualsTable)
-                        .values(file_urls.map(({ title, file_url }: { title: string; file_url: string }) => ({
-                                partId: part.id,
-                                title,
-                                fileUrl: file_url,
-                        })))
-                        .returning();
+                const manuals = file_urls.length === 0
+                        ? []
+                        : await tx
+                                .insert(partManualsTable)
+                                .values(file_urls.map(({ title, file_url }: { title: string; file_url: string }) => ({
+                                        partId: part.id,
+                                        title,
+                                        fileUrl: file_url,
+                                })))
+                                .returning();
 
                 return { project, part, manuals };
         });
