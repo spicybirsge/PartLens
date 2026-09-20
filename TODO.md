@@ -11,3 +11,6 @@
 - [x] Update and manage project end points ui(frontend)
 - [ ] Other manage project endpoints
 - [ ] Delete files from CDN when project deleted or updated including manuals.
+
+notes:
+create part with manual, add manual to part, update part,delete part and delete manual from part apis have all been done
