@@ -44,6 +44,7 @@ function getFieldErrors(name: string, description: string, file: File | null, ha
 export default function ManageProject({ id }: { id: string }) {
   const router = useRouter()
   const { user, loaded, checkIfLoggedIn } = userStore()
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [project, setProject] = useState<ProjectDetails | null>(null)
   const [loadingProject, setLoadingProject] = useState(true)
