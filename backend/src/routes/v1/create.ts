@@ -37,7 +37,7 @@ router.post('/project', verifySession, validate(createProjectValidator), async (
 
 })
 
-router.post('/manual', verifySession, validate(createManualValidator), async (req, res) => {
+router.post('/part', verifySession, validate(createManualValidator), async (req, res) => {
         const { public_id, name, part_number, description, file_urls } = req.body;
 
         const result = await database.transaction(async (tx) => {
