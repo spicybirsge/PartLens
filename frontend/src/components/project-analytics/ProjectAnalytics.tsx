@@ -20,20 +20,13 @@ import { Separator } from "../ui/separator"
 import { SidebarTrigger } from "../ui/sidebar"
 import { Skeleton } from "../ui/skeleton"
 import { getApiErrorMessage, readJsonResponse } from "@/lib/project-form"
+import {
+  formatViewedAt,
+  isProjectAnalytics,
+  type ProjectAnalytics as ProjectAnalyticsData,
+} from "@/lib/project-analytics"
 import { userStore } from "@/store/store"
 import vars from "@/vars/vars"
-
-type Analytics = {
-  project: {
-    name: string
-    publicId: string
-  }
-  uniqueViewers: number
-  viewersToday: number
-  viewersThisWeek: number
-  viewersThisMonth: number
-  recentlyViewed: string[]
-}
 
 type Stat = {
   label: string
@@ -42,36 +35,10 @@ type Stat = {
   icon: typeof Eye
 }
 
-function isAnalytics(value: unknown): value is Analytics {
-  if (!value || typeof value !== "object") return false
-  const data = value as Partial<Analytics>
-  return (
-    !!data.project &&
-    typeof data.project === "object" &&
-    typeof data.project.name === "string" &&
-    typeof data.project.publicId === "string" &&
-    typeof data.uniqueViewers === "number" &&
-    typeof data.viewersToday === "number" &&
-    typeof data.viewersThisWeek === "number" &&
-    typeof data.viewersThisMonth === "number" &&
-    Array.isArray(data.recentlyViewed) &&
-    data.recentlyViewed.every((date) => typeof date === "string")
-  )
-}
-
-function formatViewedAt(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "Unknown time"
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date)
-}
-
 export default function ProjectAnalytics({ id }: { id: string }) {
   const router = useRouter()
   const { user, loaded, checkIfLoggedIn } = userStore()
-  const [analytics, setAnalytics] = useState<Analytics | null>(null)
+  const [analytics, setAnalytics] = useState<ProjectAnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -106,7 +73,7 @@ export default function ProjectAnalytics({ id }: { id: string }) {
         const data = payload && typeof payload === "object"
           ? (payload as { data?: unknown }).data
           : null
-        if (!isAnalytics(data)) throw new Error("The project analytics response was invalid.")
+        if (!isProjectAnalytics(data)) throw new Error("The project analytics response was invalid.")
         setAnalytics(data)
         document.title = `Project Analytics — ${data.project.name} | PartLens`
       } catch (error) {
@@ -174,18 +141,42 @@ export default function ProjectAnalytics({ id }: { id: string }) {
           <Separator className="my-6" />
 
           {loading ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {Array.from({ length: 4 }, (_, index) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <Skeleton className="h-4 w-28" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-9 w-20" />
-                    <Skeleton className="mt-2 h-4 w-36" />
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {Array.from({ length: 4 }, (_, index) => (
+                  <Card key={index}>
+                    <CardHeader>
+                      <Skeleton className="h-4 w-28" />
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-9 w-20" />
+                      <Skeleton className="mt-2 h-4 w-36" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-4 w-72 max-w-full" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 rounded-lg border p-2">
+                    {Array.from({ length: 3 }, (_, index) => (
+                      <div className="flex items-center justify-between gap-4 rounded-md px-2 py-3" key={index}>
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="size-8 rounded-full" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-44 max-w-[45vw]" />
+                            <Skeleton className="h-3 w-28" />
+                          </div>
+                        </div>
+                        <Skeleton className="h-4 w-40 max-w-[35vw]" />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           ) : loadError ? (
             <Card className="border-destructive/30 bg-destructive/5">
@@ -224,8 +215,8 @@ export default function ProjectAnalytics({ id }: { id: string }) {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Recently viewed</CardTitle>
-                  <CardDescription>The latest unique viewer activity for this project.</CardDescription>
+                  <CardTitle>Recent views</CardTitle>
+                  <CardDescription>The latest viewer activity for this project.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {analytics.recentlyViewed.length > 0 ? (
@@ -236,12 +227,15 @@ export default function ProjectAnalytics({ id }: { id: string }) {
                             <span className="flex size-8 items-center justify-center rounded-full bg-muted">
                               <Eye className="size-4 text-muted-foreground" />
                             </span>
-                            <span className="text-sm font-medium">
-                              Viewer {index + 1}
-                            </span>
+                            <div>
+                              <p className="text-sm font-medium">A user visited this project</p>
+                              <p className="text-xs text-muted-foreground">
+                                visitor activity
+                              </p>
+                            </div>
                           </div>
                           <time className="text-right text-sm text-muted-foreground" dateTime={viewedAt}>
-                            {formatViewedAt(viewedAt)}
+                            On {formatViewedAt(viewedAt)}
                           </time>
                         </div>
                       ))}
