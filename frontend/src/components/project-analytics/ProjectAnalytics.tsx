@@ -180,11 +180,11 @@ export default function ProjectAnalytics({ id }: { id: string }) {
             </div>
           ) : loadError ? (
             <Card className="border-destructive/30 bg-destructive/5">
-              <CardContent className="flex flex-wrap items-center gap-3 pt-6">
+              <CardContent className="flex flex-wrap items-center gap-3 ">
                 <AlertCircle className="size-5 shrink-0 text-destructive" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-destructive">Unable to load analytics</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{loadError}</p>
+                  <p className="font-medium text-destructive">{loadError}</p>
+                 
                 </div>
                
               </CardContent>
