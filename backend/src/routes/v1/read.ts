@@ -1,5 +1,5 @@
 import express from "express"
-import { and, count, eq, inArray, desc } from "drizzle-orm";
+import { and, count, eq, gte, inArray, desc } from "drizzle-orm";
 import { database } from "../../db/index.js";
 import { partsTable, partManualsTable, projectTable, projectViewsTable, usersTable } from "../../db/schema.js";
 import verifySession from "../../middleware/verifySession.js";
@@ -102,6 +102,100 @@ router.get('/project/:publicId/details', verifySession, async (req, res) => {
                 success: true,
                 message: "Project details retrieved",
                 data: project,
+                code: 200,
+        });
+});
+
+router.get('/project/:publicId/analytics', verifySession, async (req, res) => {
+        const { publicId } = req.params;
+        if (typeof publicId !== "string") {
+                return res.status(400).json({
+                        success: false,
+                        message: "Invalid project identifier",
+                        data: null,
+                        code: 400,
+                });
+        }
+
+        const [project] = await database
+                .select({
+                        id: projectTable.id,
+                        publicId: projectTable.publicId,
+                        name: projectTable.name,
+                })
+                .from(projectTable)
+                .where(and(
+                        eq(projectTable.publicId, publicId),
+                        eq(projectTable.userId, req.user!.id),
+                ))
+                .limit(1);
+
+        if (!project) {
+                return res.status(404).json({
+                        success: false,
+                        message: "Project not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        const now = new Date();
+        const startOfToday = new Date(now);
+        startOfToday.setUTCHours(0, 0, 0, 0);
+        const startOfWeek = new Date(startOfToday);
+        const dayOfWeek = startOfWeek.getUTCDay();
+        startOfWeek.setUTCDate(startOfWeek.getUTCDate() - dayOfWeek);
+        const startOfMonth = new Date(Date.UTC(
+                now.getUTCFullYear(),
+                now.getUTCMonth(),
+                1,
+        ));
+
+        const [total, today, thisWeek, thisMonth, recentViews] = await Promise.all([
+                database
+                        .select({ count: count() })
+                        .from(projectViewsTable)
+                        .where(eq(projectViewsTable.projectId, project.id)),
+                database
+                        .select({ count: count() })
+                        .from(projectViewsTable)
+                        .where(and(
+                                eq(projectViewsTable.projectId, project.id),
+                                gte(projectViewsTable.viewedAt, startOfToday),
+                        )),
+                database
+                        .select({ count: count() })
+                        .from(projectViewsTable)
+                        .where(and(
+                                eq(projectViewsTable.projectId, project.id),
+                                gte(projectViewsTable.viewedAt, startOfWeek),
+                        )),
+                database
+                        .select({ count: count() })
+                        .from(projectViewsTable)
+                        .where(and(
+                                eq(projectViewsTable.projectId, project.id),
+                                gte(projectViewsTable.viewedAt, startOfMonth),
+                        )),
+                database
+                        .select({ viewedAt: projectViewsTable.viewedAt })
+                        .from(projectViewsTable)
+                        .where(eq(projectViewsTable.projectId, project.id))
+                        .orderBy(desc(projectViewsTable.viewedAt))
+                        .limit(10),
+        ]);
+
+        return res.status(200).json({
+                success: true,
+                message: "Project analytics retrieved",
+                data: {
+                        project,
+                        uniqueViewers: Number(total[0]?.count ?? 0),
+                        viewersToday: Number(today[0]?.count ?? 0),
+                        viewersThisWeek: Number(thisWeek[0]?.count ?? 0),
+                        viewersThisMonth: Number(thisMonth[0]?.count ?? 0),
+                        recentlyViewed: recentViews.map(({ viewedAt }) => viewedAt),
+                },
                 code: 200,
         });
 });
