@@ -240,7 +240,7 @@ export default function ManageProject({ id }: { id: string }) {
             <div>
               <p className="text-sm text-muted-foreground">Manage your projects general details here</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">Project Details</h1>
-              {!loadingProject && project && (
+              {loadingProject ? <Skeleton className="mt-2 h-5 w-64" /> : project && (
                 <p className="mt-1 max-w-[min(32rem,70vw)] truncate text-sm font-medium text-foreground/80" title={project.name}>
                   Editing: {project.name.trim() || "Untitled project"}
                 </p>

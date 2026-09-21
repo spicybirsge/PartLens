@@ -64,6 +64,7 @@ const emptyPartForm: PartForm = { partNumber: "", name: "", description: "" }
 export default function ManageManuals({ id }: { id: string }) {
   const router = useRouter()
   const { user, loaded, checkIfLoggedIn } = userStore()
+  
   const [project, setProject] = useState<Project | null>(null)
   const [parts, setParts] = useState<Part[]>([])
   const [selectedPartId, setSelectedPartId] = useState<string | null>(null)
@@ -111,6 +112,7 @@ export default function ManageManuals({ id }: { id: string }) {
         setProject(result.project)
         setParts(result.parts)
         setSelectedPartId(result.parts[0]?.id ?? null)
+        document.title = `Project Manuals — ${result.project.name} | PartLens`
       } catch (error) {
         if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : "Unable to load project parts.")
       } finally {
