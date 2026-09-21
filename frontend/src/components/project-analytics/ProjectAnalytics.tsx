@@ -133,7 +133,7 @@ export default function ProjectAnalytics({ id }: { id: string }) {
                 <Skeleton className="mt-2 h-5 w-64" />
               ) : analytics ? (
                 <p className="mt-1 max-w-[min(32rem,70vw)] truncate text-sm font-medium text-foreground/80">
-                 Viewing analytics: {analytics.project.name}
+                 Viewing analytics for: {analytics.project.name}
                 </p>
               ) : null}
             </div>
@@ -186,10 +186,7 @@ export default function ProjectAnalytics({ id }: { id: string }) {
                   <p className="font-medium text-destructive">Unable to load analytics</p>
                   <p className="mt-1 text-sm text-muted-foreground">{loadError}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-                  <RefreshCw />
-                  Try again
-                </Button>
+               
               </CardContent>
             </Card>
           ) : analytics ? (
@@ -216,7 +213,7 @@ export default function ProjectAnalytics({ id }: { id: string }) {
               <Card>
                 <CardHeader>
                   <CardTitle>Recent views</CardTitle>
-                  <CardDescription>The latest viewer activity for this project.</CardDescription>
+                  <CardDescription>The latest unique viewer activity for this project.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {analytics.recentlyViewed.length > 0 ? (
