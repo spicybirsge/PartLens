@@ -2,13 +2,18 @@
 
 import { Component, memo, Suspense, useEffect, useMemo, type ReactNode } from "react"
 import { Canvas } from "@react-three/fiber"
-import { Bounds, OrbitControls, useGLTF } from "@react-three/drei"
+import { Bounds, Html, OrbitControls, useGLTF, useProgress } from "@react-three/drei"
 
 function PreviewModel({ url }: { url: string }) {
   const gltf = useGLTF(url)
   const scene = useMemo(() => gltf.scene.clone(), [gltf.scene])
 
   return <primitive object={scene} />
+}
+
+function PreviewLoading() {
+  const { progress } = useProgress()
+  return <Html center className="whitespace-nowrap rounded-md bg-background/90 px-3 py-2 text-sm text-muted-foreground shadow">Loading model… {Math.round(progress)}%</Html>
 }
 
 class PreviewErrorBoundary extends Component<
@@ -48,7 +53,7 @@ function GlbPreview({ url, onError }: GlbPreviewProps) {
         <ambientLight intensity={1.2} />
         <directionalLight position={[5, 5, 5]} intensity={1.5} />
         <PreviewErrorBoundary onError={onError}>
-          <Suspense fallback={null}>
+          <Suspense fallback={<PreviewLoading />}>
             <Bounds fit clip margin={1.35}>
               <PreviewModel url={url} />
             </Bounds>
