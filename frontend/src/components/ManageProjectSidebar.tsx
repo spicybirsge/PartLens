@@ -6,7 +6,8 @@ import {
   ArrowLeft,
   BarChart3,
   FileText,
-  InfoIcon
+  InfoIcon,
+  ExternalLink
 } from "lucide-react"
 import { useState } from "react"
 
@@ -34,6 +35,7 @@ function SidebarNavigation({ projectId }: { projectId: string }) {
     { label: "Details", href: projectPath, icon: InfoIcon },
     { label: "Manuals", href: `${projectPath}/manuals`, icon: FileText },
     { label: "Analytics", href: `${projectPath}/analytics`, icon: BarChart3 },
+    {label: "Public page", href:`/project/${projectId}`, icon:ExternalLink}
   ]
 
   return (
