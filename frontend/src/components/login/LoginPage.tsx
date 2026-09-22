@@ -45,7 +45,7 @@ export default function LoginPage() {
         <>
         <Navbar></Navbar>
         <div className="flex min-h-[calc(100svh-4rem)] items-center justify-center bg-background px-4 py-8">
-            <Card className="w-full max-w-sm">
+            <Card className="w-full max-w-md">
                 <CardHeader className="space-y-1 text-center relative">
                     <Button
                         variant="ghost"

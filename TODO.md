@@ -16,6 +16,7 @@
 
 
 - [ ] Delete files from CDN when project deleted or updated including manuals.(low priority)
+- [ ] When validating if file exists via head request, also check content-type header(low priority)
 
 notes:
 create part with manual, add manual to part, update part,delete part and delete manual from part apis have all been done
