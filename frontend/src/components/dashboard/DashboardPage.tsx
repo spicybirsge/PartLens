@@ -18,9 +18,7 @@ export default function DashboardPage() {
     } 
   }, [loaded, user, checkIfLoggedIn, router])
 
-  if (!loaded) {
-    return 
-  }
+
 
   return <>
   {!loaded ? <PageLoading /> : user ? <DashboardSidebar>
