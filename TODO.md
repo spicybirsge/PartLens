@@ -11,12 +11,9 @@
 - [x] Update and manage project end points ui(frontend)
 - [x] Other manage project endpoints
 
-
-
-
-
-- [ ] Delete files from CDN when project deleted or updated including manuals.(low priority)
-- [ ] When validating if file exists via head request, also check content-type header(low priority)
+# Priorities after system completed
+- [ ] Delete files from CDN when project deleted or updated including manuals.
+- [ ] When validating if file exists via head request, also check content-type header
 - [ ] Security considerations [Claude chat](https://claude.ai/chat/b47421d2-4710-4899-9f1b-f24148c75c9a)
 
 notes:
