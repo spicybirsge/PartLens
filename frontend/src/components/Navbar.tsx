@@ -3,15 +3,18 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { SiGithub } from "@icons-pack/react-simple-icons"
+import { Menu, X } from "lucide-react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 
 export default function Navbar() {
   const pathname = usePathname()
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
           <img
             src="/logo_partlens.png"
@@ -23,16 +26,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-1">
-          <Link href="/">
-            <Button
-              variant={pathname === "/" ? "secondary" : "ghost"}
-              size="sm"
-              className="mr-1"
-            >
-              Home
-            </Button>
-          </Link>
+        <div className="hidden items-center gap-1 md:flex">
           <Link href="/about">
             <Button
               variant={pathname.toLowerCase() === "/about" ? "secondary" : "ghost"}
@@ -40,6 +34,16 @@ export default function Navbar() {
               className="mr-1"
             >
               About
+            </Button>
+          </Link>
+
+          <Link href="/login">
+            <Button
+              variant="default"
+              size="sm"
+              className="mr-1 shadow-sm"
+            >
+              Sign Up
             </Button>
           </Link>
           <Separator orientation="vertical" className="mx-1 h-6" />
@@ -55,6 +59,52 @@ export default function Navbar() {
             </Button>
           </a>
         </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={menuOpen}
+          aria-controls="mobile-navigation"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? <X /> : <Menu />}
+        </Button>
+
+        {menuOpen && (
+          <div
+            id="mobile-navigation"
+            className="absolute inset-x-4 top-[calc(100%+0.5rem)] flex flex-col gap-2 rounded-xl border bg-background p-2 shadow-lg md:hidden"
+          >
+            <Link href="/about" onClick={() => setMenuOpen(false)}>
+              <Button
+                variant={pathname.toLowerCase() === "/about" ? "secondary" : "ghost"}
+                className="w-full justify-start"
+              >
+                About
+              </Button>
+            </Link>
+            <Link href="/login" onClick={() => setMenuOpen(false)}>
+              <Button variant="default" className="w-full justify-start shadow-sm">
+                Sign Up
+              </Button>
+            </Link>
+            <Separator />
+            <a
+              href="https://github.com/spicybirsge/PartLens"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+              onClick={() => setMenuOpen(false)}
+            >
+              <Button variant="ghost" className="w-full justify-start gap-2">
+                <SiGithub size={18} />
+                GitHub
+              </Button>
+            </a>
+          </div>
+        )}
       </div>
     </nav>
   )

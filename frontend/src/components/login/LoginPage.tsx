@@ -10,6 +10,7 @@ import { userStore } from '@/store/store';
 import { useRouter } from 'next/navigation';
 import PageLoading from '../PageLoading';
 import vars from '@/vars/vars';
+import Navbar from '../Navbar';
 export default function LoginPage() {
 
     const router = useRouter()
@@ -40,7 +41,9 @@ export default function LoginPage() {
         return <><PageLoading></PageLoading></>
     }
     return (
-        <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <>
+        <Navbar></Navbar>
+        <div className="flex min-h-[calc(100svh-4rem)] items-center justify-center bg-background px-4 py-8">
             <Card className="w-full max-w-sm">
                 <CardHeader className="space-y-1 text-center relative">
                     <Button
@@ -61,6 +64,6 @@ export default function LoginPage() {
 
                 </CardContent>
             </Card>
-        </div>
+        </div></>
     )
 }
