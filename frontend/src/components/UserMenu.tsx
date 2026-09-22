@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ChevronUp, FileText, LogOut, Shield } from "lucide-react"
+import { ChevronUp, FileText, LogOut, Scale, Shield, Info } from "lucide-react"
+import { SiGithub } from "@icons-pack/react-simple-icons"
 import { useMemo } from "react"
 
 import { userStore } from "@/store/store"
@@ -17,6 +18,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -91,15 +95,37 @@ export default function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Legal</DropdownMenuLabel>
-        <DropdownMenuItem render={<Link href="/terms" />}>
-          <FileText />
-          Terms of Service
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Info />
+            Learn more
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuLabel>Legal</DropdownMenuLabel>
+            <DropdownMenuItem render={<Link href="/terms" />}>
+              <FileText />
+              Terms of Service
+            </DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/privacy" />}>
+              <Shield />
+              Privacy Policy
+            </DropdownMenuItem>
+  <DropdownMenuLabel>Contribute</DropdownMenuLabel>
+             <DropdownMenuItem
+          render={
+            <a
+              href="https://github.com/spicybirsge/PartLens"
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          }
+        >
+          <SiGithub />
+          GitHub
         </DropdownMenuItem>
-        <DropdownMenuItem render={<Link href="/privacy" />}>
-          <Shield />
-          Privacy Policy
-        </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+       
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={handleLogout}>
           <LogOut />
