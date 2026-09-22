@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/sidebar"
 
 const navigation = [
-  { label: "Overview", href: "/", icon: LayoutDashboard },
+  { label: "Home", href: "/", icon: LayoutDashboard },
   { label: "Bookmarks", href: "/bookmarks", icon: BookOpen },
   { label: "Discover", href: "/search", icon: Search },
 ]

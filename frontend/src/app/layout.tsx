@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 export const metadata: Metadata = {
   applicationName: "PartLens",
   title: {
-    default: "Home | PartLens",
+    default: "PartLens",
     template: "%s | PartLens",
   },
   description:

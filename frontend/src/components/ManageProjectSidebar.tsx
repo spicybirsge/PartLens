@@ -46,10 +46,10 @@ function SidebarNavigation({ projectId }: { projectId: string }) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 render={<Link href="/" />}
-                tooltip="Back to projects"
+                tooltip="Back to home"
               >
                 <ArrowLeft />
-                <span>Back to projects</span>
+                <span>Back to home</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
