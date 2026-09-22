@@ -25,6 +25,8 @@ import {
   type Stats,
 } from "@/lib/projects"
 
+import { usePathname } from "next/navigation"
+
 function StatsSkeleton() {
   return (
     <section className="grid gap-4 sm:grid-cols-3">
@@ -68,6 +70,7 @@ function ProjectCardsSkeleton() {
 }
 
 export default function DashboardHome() {
+  const pathname = usePathname()
   const { user } = userStore()
   const router = useRouter()
 
@@ -80,9 +83,12 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
 
+
+
   useEffect(() => {
-    document.title = "Overview | PartLens"
+   
     const fetchProjects = async () => {
+      
       const token = localStorage.getItem("token")
       if (!token) return
 

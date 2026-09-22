@@ -7,7 +7,7 @@ import DashboardSidebar from "@/components/DashboardSidebar"
 import DashboardHome from "@/components/dashboard/DashboardHome"
 import PageLoading from "@/components/PageLoading"
 import { userStore } from "@/store/store"
-
+import HomePage from "@/components/home-page/HomePage"
 export default function DashboardPage() {
   const router = useRouter()
   const { user, loaded, checkIfLoggedIn } = userStore()
@@ -15,18 +15,17 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loaded) {
       checkIfLoggedIn()
-    } else if (!user) {
-      router.push("/login", { scroll: false })
-    }
+    } 
   }, [loaded, user, checkIfLoggedIn, router])
 
-  if (!loaded || !user) {
-    return <PageLoading />
+  if (!loaded) {
+    return 
   }
 
-  return (
-    <DashboardSidebar>
+  return <>
+  {!loaded ? <PageLoading /> : user ? <DashboardSidebar>
       <DashboardHome />
-    </DashboardSidebar>
-  )
+    </DashboardSidebar> : <HomePage></HomePage>}
+    
+  </>
 }
