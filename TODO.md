@@ -9,7 +9,7 @@
 - [x] Fix dashboard update(remove machines from sidebar add search, consistent naming projects and remove machines wording) 
 - [x] Create the /new page where you create new projects in frontend
 - [x] Update and manage project end points ui(frontend)
-- [ x Other manage project endpoints
+- [x] Other manage project endpoints
 
 
 
