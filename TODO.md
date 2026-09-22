@@ -17,6 +17,7 @@
 
 - [ ] Delete files from CDN when project deleted or updated including manuals.(low priority)
 - [ ] When validating if file exists via head request, also check content-type header(low priority)
+- [ ] Security considerations [Claude chat](https://claude.ai/chat/b47421d2-4710-4899-9f1b-f24148c75c9a)
 
 notes:
 create part with manual, add manual to part, update part,delete part and delete manual from part apis have all been done
