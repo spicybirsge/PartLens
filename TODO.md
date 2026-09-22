@@ -10,6 +10,8 @@
 - [x] Create the /new page where you create new projects in frontend
 - [x] Update and manage project end points ui(frontend)
 - [x] Other manage project endpoints
+- [ ] Update account profile details api routes
+ 
 
 # Priorities after system completed
 - [ ] Delete files from CDN when project deleted or updated including manuals.
