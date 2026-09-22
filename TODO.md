@@ -9,8 +9,13 @@
 - [x] Fix dashboard update(remove machines from sidebar add search, consistent naming projects and remove machines wording) 
 - [x] Create the /new page where you create new projects in frontend
 - [x] Update and manage project end points ui(frontend)
-- [ ] Other manage project endpoints
-- [ ] Delete files from CDN when project deleted or updated including manuals.
+- [ x Other manage project endpoints
+
+
+
+
+
+- [ ] Delete files from CDN when project deleted or updated including manuals.(low priority)
 
 notes:
 create part with manual, add manual to part, update part,delete part and delete manual from part apis have all been done
