@@ -3,10 +3,16 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { SiGithub } from "@icons-pack/react-simple-icons"
-import { Menu, X } from "lucide-react"
+import { Menu, Scale, X } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -17,7 +23,7 @@ export default function Navbar() {
       <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
           <img
-            src="/logo_partlens.png"
+            src="/favicon-96x96.png"
             alt="PartLens logo"
             className="h-8 w-8 object-contain"
           />
@@ -58,6 +64,23 @@ export default function Navbar() {
               <span className="sr-only">GitHub</span>
             </Button>
           </a>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="ghost" size="icon-sm" aria-label="Legal">
+                  <Scale className="h-4 w-4" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem render={<Link href="/terms" />}>
+                Terms of Service
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/privacy" />}>
+                Privacy Policy
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <Button
@@ -103,6 +126,24 @@ export default function Navbar() {
                 GitHub
               </Button>
             </a>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="ghost" className="w-full justify-start gap-2">
+                    <Scale className="h-4 w-4" />
+                    Legal
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem render={<Link href="/terms" />}>
+                  Terms of Service
+                </DropdownMenuItem>
+                <DropdownMenuItem render={<Link href="/privacy" />}>
+                  Privacy Policy
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>

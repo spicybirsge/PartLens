@@ -1,7 +1,8 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { ChevronUp, LogOut } from "lucide-react"
+import Link from "next/link"
+import { ChevronUp, FileText, LogOut, Shield } from "lucide-react"
 import { useMemo } from "react"
 
 import { userStore } from "@/store/store"
@@ -89,6 +90,16 @@ export default function UserMenu() {
             </div>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Legal</DropdownMenuLabel>
+        <DropdownMenuItem render={<Link href="/terms" />}>
+          <FileText />
+          Terms of Service
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/privacy" />}>
+          <Shield />
+          Privacy Policy
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={handleLogout}>
           <LogOut />

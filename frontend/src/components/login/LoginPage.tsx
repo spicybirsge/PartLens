@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import GoogleIcon from '../icons/flat-color-icons-google';
 import { useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 import { userStore } from '@/store/store';
 import { useRouter } from 'next/navigation';
@@ -61,6 +62,27 @@ export default function LoginPage() {
                     <GoogleIcon />
                     <span className="ml-2">Continue with Google</span>
                 </Button></a>
+                <p className="mt-4 text-center text-xs text-muted-foreground">
+                    By continuing, you agree to our{" "}
+                    <Link
+                        href="/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-4 hover:text-foreground"
+                    >
+                        Terms of Service
+                    </Link>{" "}
+                    and{" "}
+                    <Link
+                        href="/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-4 hover:text-foreground"
+                    >
+                        Privacy Policy
+                    </Link>
+                    .
+                </p>
 
                 </CardContent>
             </Card>
