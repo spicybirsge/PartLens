@@ -10,7 +10,8 @@ type InteractiveGlbViewerProps = {
   selectedPartName?: string | null
   onPartClick: (name: string) => void
   onHoverChange?: (name: string | null) => void
-  onError: (message: string) => void
+  onError: (message: string) => void,
+  isManaging?: boolean
 }
 
 function InteractiveModel({
@@ -94,6 +95,7 @@ export default function InteractiveGlbViewer({
   onPartClick,
   onHoverChange,
   onError,
+  isManaging = true,
 }: InteractiveGlbViewerProps) {
   const [hovered, setHovered] = useState(false)
   const [hoveredPartName, setHoveredPartName] = useState<string | null>(null)
@@ -130,7 +132,7 @@ export default function InteractiveGlbViewer({
         <OrbitControls enableDamping dampingFactor={0.08} />
       </Canvas>
       <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-background/85 px-2.5 py-1.5 text-xs text-muted-foreground shadow-sm">
-        Hover a named object, then click to configure it
+       {isManaging?"Hover a named object, then click to configure it" : "Click on a part to filter manuals relevant only to that part"} 
       </div>
     </div>
   )
