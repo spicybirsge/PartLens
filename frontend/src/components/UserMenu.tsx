@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ChevronUp, FileText, LogOut, Scale, Shield, Info } from "lucide-react"
+import { ChevronUp, FileText, LogOut, User2, Shield, Info } from "lucide-react"
 import { SiGithub } from "@icons-pack/react-simple-icons"
 import { useMemo } from "react"
 
@@ -95,7 +95,12 @@ export default function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+         <DropdownMenuItem render={<Link href={`/user/${user.username}`}/>}>
+          <User2 />
+          View Profile
+        </DropdownMenuItem>
         <DropdownMenuSub>
+          
           <DropdownMenuSubTrigger>
             <Info />
             Learn more
@@ -129,7 +134,7 @@ export default function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={handleLogout}>
           <LogOut />
-          Log out
+          Log Out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
