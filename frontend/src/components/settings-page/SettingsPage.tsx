@@ -354,7 +354,7 @@ export default function SettingsPage() {
                                     </Avatar>
                                     <div className="min-w-0">
                                         <p className="font-medium">{user.email}</p>
-                                        <p className="text-sm text-muted-foreground">Your email address is managed by Google.</p>
+                                        <p className="text-sm text-muted-foreground">Your account is connected to your Google account.</p>
                                     </div>
                                     <div className="flex w-full shrink-0 flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
                                         <input
@@ -365,7 +365,7 @@ export default function SettingsPage() {
                                             onChange={handleImageSelected}
                                         />
                                         <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => imageInputRef.current?.click()}>
-                                            <ImagePlus /> Change photo
+                                            <ImagePlus /> Change avatar
                                         </Button>
                                         {(user.avatarUrl || selectedImage) && (
                                             <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={handleRemoveImage}>
