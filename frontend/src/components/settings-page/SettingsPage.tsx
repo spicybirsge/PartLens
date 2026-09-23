@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 import { Input } from "../ui/input"
 import { Button } from "../ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
-import { UAParser } from 'ua-parser-js';
+import { formatDate, describeUserAgent }  from "@/lib/user-settings" 
 import {
     Dialog,
     DialogContent,
@@ -286,30 +286,7 @@ export default function SettingsPage() {
         setCropOpen(false)
         toast.add({type: "info",title: "Reminder", description: "Remember to click save changes to update your avatar"})
     }
-const describeUserAgent = (userAgent: string | null) => {
-    if (!userAgent || userAgent === "unknown") return "Unknown device"
 
-    const { browser, os, device } = UAParser(userAgent)
-
-    const browserName = browser.name ?? "Unknown browser"
-    const browserVersion = browser.version ? ` version ${browser.version.split(".")[0]}` : ""
-
-    const osName = os.name ?? "Unknown OS"
-    const osVersion = os.version ? ` ${os.version}` : ""
-
-    const deviceLabel = device.model
-        ? ` (${device.vendor ? `${device.vendor} ` : ""}${device.model})`
-        : ""
-
-    return `${browserName} browser${browserVersion} on ${osName}${osVersion}${deviceLabel}`
-}
-    const formatDate = (date: string | null) => {
-        if (!date) return "Never"
-        return new Intl.DateTimeFormat(undefined, {
-            dateStyle: "medium",
-            timeStyle: "short",
-        }).format(new Date(date))
-    }
 
     if (!loaded || !user) {
         return <PageLoading />
@@ -554,10 +531,10 @@ const describeUserAgent = (userAgent: string | null) => {
         <Dialog open={confirmation !== null} onOpenChange={(open) => !open && setConfirmation(null)}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{confirmation === "logoutOthers" ? "Log out other sessions?" : "Log out?"}</DialogTitle>
+                    <DialogTitle>{confirmation === "logoutOthers" ? "Log out from other devices?" : "Log out?"}</DialogTitle>
                     <DialogDescription>
                         {confirmation === "logoutOthers"
-                            ? "Every other active session will be terminated. Your current session will remain active."
+                            ? "Every other deviced will be signed out of PartLens. This device will remain active."
                             : "You will be signed out of PartLens on this device."}
                     </DialogDescription>
                 </DialogHeader>
