@@ -292,17 +292,16 @@ const describeUserAgent = (userAgent: string | null) => {
     const { browser, os, device } = UAParser(userAgent)
 
     const browserName = browser.name ?? "Unknown browser"
-    const browserVersion = browser.version ? ` ${browser.version.split(".")[0]}` : ""
+    const browserVersion = browser.version ? ` version ${browser.version.split(".")[0]}` : ""
 
     const osName = os.name ?? "Unknown OS"
     const osVersion = os.version ? ` ${os.version}` : ""
 
-    // device.model/vendor are only populated for phones/tablets, not desktops
     const deviceLabel = device.model
         ? ` (${device.vendor ? `${device.vendor} ` : ""}${device.model})`
         : ""
 
-    return `${browserName}${browserVersion} on ${osName}${osVersion}${deviceLabel}`
+    return `${browserName} browser${browserVersion} on ${osName}${osVersion}${deviceLabel}`
 }
     const formatDate = (date: string | null) => {
         if (!date) return "Never"
@@ -440,7 +439,7 @@ const describeUserAgent = (userAgent: string | null) => {
                 <Card className="mt-6">
                     <CardHeader className="flex-row items-start justify-between gap-4">
                         <div>
-                            <CardTitle>Active sessions</CardTitle>
+                            <CardTitle>Active devices</CardTitle>
                             <CardDescription>These are the devices currently signed in to your account.</CardDescription>
                         </div>
                         <Button type="button" variant="outline" size="sm" onClick={() => void fetchSessions()} disabled={sessionsLoading}>
@@ -452,7 +451,7 @@ const describeUserAgent = (userAgent: string | null) => {
                         {sessionsError && <p className="text-sm text-destructive">{sessionsError}</p>}
                         {sessionsLoading && sessions.length === 0 && <p className="text-sm text-muted-foreground">Loading sessions...</p>}
                         {!sessionsLoading && !sessionsError && sessions.length === 0 && (
-                            <p className="text-sm text-muted-foreground">No active sessions found.</p>
+                            <p className="text-sm text-muted-foreground">No active devices found.</p>
                         )}
                         <div className="divide-y rounded-lg border">
                             {sessions.map((session) => (
@@ -487,7 +486,7 @@ const describeUserAgent = (userAgent: string | null) => {
                                     disabled={isLoggingOutOthers}
                                 >
                                     {isLoggingOutOthers && <Loader2 className="animate-spin" />}
-                                    {isLoggingOutOthers ? "Logging out..." : "Log out of all other sessions"}
+                                    {isLoggingOutOthers ? "Logging out..." : "Log out of all other devices"}
                                 </Button>
                             )}
                             <Button type="button" variant="destructive" className="h-9 w-full sm:w-auto" onClick={() => setConfirmation("logout")}>
