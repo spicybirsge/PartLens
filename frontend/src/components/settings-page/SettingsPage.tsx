@@ -503,7 +503,16 @@ export default function SettingsPage() {
                 </Card>
             </div></main></DashboardSidebar>
 
-        <Dialog open={cropOpen} onOpenChange={setCropOpen}>
+        <Dialog
+            open={cropOpen}
+            onOpenChange={(open) => {
+                if (open) {
+                    setCropOpen(true)
+                } else {
+                    cancelImageSelection()
+                }
+            }}
+        >
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Crop profile photo</DialogTitle>
