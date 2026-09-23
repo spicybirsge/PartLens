@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 import { Input } from "../ui/input"
 import { Button } from "../ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
+import { UAParser } from 'ua-parser-js';
 import {
     Dialog,
     DialogContent,
@@ -283,32 +284,26 @@ export default function SettingsPage() {
         setSelectedImageFile(new File([blob], "profile-image.jpg", { type: "image/jpeg" }))
         setSelectedImage(URL.createObjectURL(blob))
         setCropOpen(false)
+        toast.add({type: "info",title: "Reminder", description: "Remember to click save changes to update your avatar"})
     }
+const describeUserAgent = (userAgent: string | null) => {
+    if (!userAgent || userAgent === "unknown") return "Unknown device"
 
-    const describeUserAgent = (userAgent: string | null) => {
-        if (!userAgent || userAgent === "unknown") return "Unknown device"
-        const browser = /Edg\/[\d.]+/.test(userAgent)
-            ? "Microsoft Edge"
-            : /Chrome\/[\d.]+/.test(userAgent)
-                ? "Google Chrome"
-                : /Firefox\/[\d.]+/.test(userAgent)
-                    ? "Mozilla Firefox"
-                    : /Safari\/[\d.]+/.test(userAgent) && !/Chrome/.test(userAgent)
-                        ? "Safari"
-                        : "Web browser"
-        const operatingSystem = /Windows/i.test(userAgent)
-            ? "Windows"
-            : /Mac OS|Macintosh/i.test(userAgent)
-                ? "macOS"
-                : /Android/i.test(userAgent)
-                    ? "Android"
-                    : /iPhone|iPad/i.test(userAgent)
-                        ? "iOS"
-                        : /Linux/i.test(userAgent)
-                            ? "Linux"
-                            : "Unknown device"
-        return `${browser} on ${operatingSystem}`
-    }
+    const { browser, os, device } = UAParser(userAgent)
+
+    const browserName = browser.name ?? "Unknown browser"
+    const browserVersion = browser.version ? ` ${browser.version.split(".")[0]}` : ""
+
+    const osName = os.name ?? "Unknown OS"
+    const osVersion = os.version ? ` ${os.version}` : ""
+
+    // device.model/vendor are only populated for phones/tablets, not desktops
+    const deviceLabel = device.model
+        ? ` (${device.vendor ? `${device.vendor} ` : ""}${device.model})`
+        : ""
+
+    return `${browserName}${browserVersion} on ${osName}${osVersion}${deviceLabel}`
+}
     const formatDate = (date: string | null) => {
         if (!date) return "Never"
         return new Intl.DateTimeFormat(undefined, {
