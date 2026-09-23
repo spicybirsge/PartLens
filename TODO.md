@@ -11,6 +11,7 @@
 - [x] Update and manage project end points ui(frontend)
 - [x] Other manage project endpoints
 - [ ] Update account profile details api routes
+- [ ] Once bookmark feature is added add that into analytics(optional after considerations maded , low priority)
  
 
 # Priorities after system completed
