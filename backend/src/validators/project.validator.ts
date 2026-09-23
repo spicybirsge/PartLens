@@ -2,6 +2,11 @@
 
 import { body } from 'express-validator';
 
+const allowedGlbMimeTypes = new Set([
+  "model/gltf-binary",
+  "application/octet-stream",
+]);
+
 export const createProjectValidator = [
   body('name')
     .isString().withMessage('name must be a string')
@@ -30,8 +35,8 @@ export const createProjectValidator = [
       if (!base) {
         throw new Error('file_url could not be validated');
       }
-      if (!value.startsWith(base) || !value.endsWith('.glb')) {
-        throw new Error('invalid file_url');
+      if (!value.startsWith(base) || !value.toLowerCase().endsWith('.glb')) {
+        throw new Error('file_url must be a valid ImageKit GLB URL');
       }
       return true;
     })
@@ -42,12 +47,14 @@ export const createProjectValidator = [
 
       try {
         const response = await fetch(value, { method: 'HEAD', signal: controller.signal });
-        if (!response.ok) {
-          throw new Error('invalid file_url');
+        const contentType = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
+
+        if (!response.ok || !contentType || !allowedGlbMimeTypes.has(contentType)) {
+          throw new Error('file_url must point to a valid GLB file');
         }
         return true;
-      } catch (err) {
-        throw new Error('invalid file_url');
+      } catch {
+        throw new Error('file_url must point to a reachable GLB file');
       } finally {
         clearTimeout(timeout);
       }
@@ -96,8 +103,8 @@ export const updateProjectValidator = [
       if (!base) {
         throw new Error('file_url could not be validated');
       }
-      if (!value.startsWith(base) || !value.endsWith('.glb')) {
-        throw new Error('invalid file_url');
+      if (!value.startsWith(base) || !value.toLowerCase().endsWith('.glb')) {
+        throw new Error('file_url must be a valid ImageKit GLB URL');
       }
       return true;
     })
@@ -108,12 +115,14 @@ export const updateProjectValidator = [
 
       try {
         const response = await fetch(value, { method: 'HEAD', signal: controller.signal });
-        if (!response.ok) {
-          throw new Error('invalid file_url');
+        const contentType = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
+
+        if (!response.ok || !contentType || !allowedGlbMimeTypes.has(contentType)) {
+          throw new Error('file_url must point to a valid GLB file');
         }
         return true;
       } catch {
-        throw new Error('invalid file_url');
+        throw new Error('file_url must point to a reachable GLB file');
       } finally {
         clearTimeout(timeout);
       }
