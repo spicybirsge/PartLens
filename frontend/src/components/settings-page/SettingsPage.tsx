@@ -347,7 +347,7 @@ export default function SettingsPage() {
                         </CardHeader>
                         <CardContent>
                             <form className="space-y-5" onSubmit={handleProfileSubmit}>
-                                <div className="flex items-center gap-4 rounded-lg border bg-muted/30 p-4">
+                                <div className="flex flex-col items-start gap-4 rounded-lg border bg-muted/30 p-4 sm:flex-row sm:items-center">
                                     <Avatar size="lg">
                                         <AvatarImage src={selectedImage || user.avatarUrl || undefined} alt={user.name} />
                                         <AvatarFallback>{initials}</AvatarFallback>
@@ -356,7 +356,7 @@ export default function SettingsPage() {
                                         <p className="font-medium">{user.email}</p>
                                         <p className="text-sm text-muted-foreground">Your email address is managed by Google.</p>
                                     </div>
-                                    <div className="ml-auto flex shrink-0 flex-col gap-2 sm:flex-row">
+                                    <div className="flex w-full shrink-0 flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
                                         <input
                                             ref={imageInputRef}
                                             type="file"
@@ -364,11 +364,11 @@ export default function SettingsPage() {
                                             className="hidden"
                                             onChange={handleImageSelected}
                                         />
-                                        <Button type="button" variant="outline" size="sm" onClick={() => imageInputRef.current?.click()}>
+                                        <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => imageInputRef.current?.click()}>
                                             <ImagePlus /> Change photo
                                         </Button>
                                         {(user.avatarUrl || selectedImage) && (
-                                            <Button type="button" variant="ghost" size="sm" onClick={handleRemoveImage}>
+                                            <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={handleRemoveImage}>
                                                 <Trash2 /> Remove
                                             </Button>
                                         )}
@@ -388,7 +388,7 @@ export default function SettingsPage() {
                                                 if (event.target.value.trim()) setFieldErrors((current) => ({ ...current, name: undefined }))
                                             }}
                                         />
-                                        {fieldErrors.name && <span className="text-xs font-normal text-destructive">{fieldErrors.name}</span>}
+                                        <span className="h-4 text-xs font-normal text-destructive">{fieldErrors.name}</span>
                                     </label>
                                     <label className="grid gap-2 text-sm font-medium">
                                         Username
@@ -404,7 +404,7 @@ export default function SettingsPage() {
                                                 if (sanitized) setFieldErrors((current) => ({ ...current, username: undefined }))
                                             }}
                                         />
-                                        {fieldErrors.username && <span className="text-xs font-normal text-destructive">{fieldErrors.username}</span>}
+                                        <span className="h-4 text-xs font-normal text-destructive">{fieldErrors.username || "\u00a0"}</span>
                                     </label>
                                 </div>
                                 <Button type="submit" disabled={isSaving}>
@@ -474,7 +474,7 @@ export default function SettingsPage() {
                                                 )}
                                             </div>
                                             <p className="truncate text-sm text-muted-foreground">
-                                                {session.ipAddress || "IP unavailable"} · Last active {formatDate(session.lastActive)}
+                                                {session.ipAddress || "Unknown ip"} · Last active {formatDate(session.lastActive)}
                                             </p>
                                             <p className="text-xs text-muted-foreground">Signed in {formatDate(session.createdAt)}</p>
                                         </div>
@@ -482,15 +482,23 @@ export default function SettingsPage() {
                                 </div>
                             ))}
                         </div>
-                        {sessions.some((session) => !session.current) && (
-                            <Button type="button" variant="outline" onClick={() => setConfirmation("logoutOthers")} disabled={isLoggingOutOthers}>
-                                {isLoggingOutOthers && <Loader2 className="animate-spin" />}
-                                {isLoggingOutOthers ? "Logging out..." : "Log out of all other sessions"}
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            {sessions.some((session) => !session.current) && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-9 w-full sm:w-auto"
+                                    onClick={() => setConfirmation("logoutOthers")}
+                                    disabled={isLoggingOutOthers}
+                                >
+                                    {isLoggingOutOthers && <Loader2 className="animate-spin" />}
+                                    {isLoggingOutOthers ? "Logging out..." : "Log out of all other sessions"}
+                                </Button>
+                            )}
+                            <Button type="button" variant="destructive" className="h-9 w-full sm:w-auto" onClick={() => setConfirmation("logout")}>
+                                <LogOut /> Log out
                             </Button>
-                        )}
-                        <Button type="button" variant="destructive" onClick={() => setConfirmation("logout")}>
-                            <LogOut /> Log out
-                        </Button>
+                        </div>
                     </CardContent>
                 </Card>
             </div></main></DashboardSidebar>
