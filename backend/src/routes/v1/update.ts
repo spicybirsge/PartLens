@@ -3,8 +3,9 @@ import verifySession from "../../middleware/verifySession.js";
 import { validate } from "../../middleware/validate.js";
 import { updateProjectValidator } from "../../validators/project.validator.js";
 import { updatePartValidator } from "../../validators/manual.validator.js";
+import { updateUserValidator } from "../../validators/user.validator.js";
 import { database } from "../../db/index.js";
-import { partsTable, projectTable } from "../../db/schema.js";
+import { partsTable, projectTable, usersTable } from "../../db/schema.js";
 import { and, eq } from "drizzle-orm";
 
 const router = express.Router()
@@ -108,6 +109,64 @@ router.patch('/manual/:partId', verifySession, validate(updatePartValidator), as
     success: true,
     message: "Part updated",
     data: updatedPart,
+    code: 200,
+  });
+});
+
+router.patch('/user', verifySession, validate(updateUserValidator), async (req, res) => {
+  const { username, name, avatar_url } = req.body;
+
+  if (username !== undefined) {
+    const [duplicate] = await database
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.username, username))
+      .limit(1);
+
+    if (duplicate && duplicate.id !== req.user!.id) {
+      return res.status(409).json({
+        success: false,
+        message: "Username already taken",
+        data: null,
+        code: 409,
+      });
+    }
+  }
+
+  const values: Partial<typeof usersTable.$inferInsert> = {
+    ...(username !== undefined && { username }),
+    ...(name !== undefined && { name }),
+    ...(avatar_url !== undefined && { avatarUrl: avatar_url }),
+    updatedAt: new Date(),
+  };
+
+  const [updatedUser] = await database
+    .update(usersTable)
+    .set(values)
+    .where(eq(usersTable.id, req.user!.id))
+    .returning({
+      id: usersTable.id,
+      username: usersTable.username,
+      name: usersTable.name,
+      email: usersTable.email,
+      avatarUrl: usersTable.avatarUrl,
+      createdAt: usersTable.createdAt,
+      updatedAt: usersTable.updatedAt,
+    });
+
+  if (!updatedUser) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+      data: null,
+      code: 404,
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "User updated",
+    data: updatedUser,
     code: 200,
   });
 });

@@ -12,6 +12,7 @@
 - [x] Other manage project endpoints
 - [ ] Update account profile details api routes
 - [ ] Once bookmark feature is added add that into analytics(optional after considerations maded , low priority)
+- [ ] update dashboard sidebar to show "profile" link aswell
  
 
 # Priorities after system completed
