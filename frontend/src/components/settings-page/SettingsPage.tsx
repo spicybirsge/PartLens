@@ -366,7 +366,7 @@ export default function SettingsPage() {
                                         <Input
                                             name="username"
                                             value={username}
-                                            placeholder="username"
+                                            placeholder="@username"
                                             maxLength={30}
                                             aria-invalid={Boolean(fieldErrors.username)}
                                             onChange={(event) => {
