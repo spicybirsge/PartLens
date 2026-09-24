@@ -11,6 +11,7 @@ declare global {
   namespace Express {
     interface Request {
       isAdmin?: boolean;
+      isAuthenticated?: boolean;
       user?: AuthUser;
       session?: AuthSession;
     }
