@@ -99,7 +99,12 @@ export default function InteractiveGlbViewer({
 }: InteractiveGlbViewerProps) {
   const [hovered, setHovered] = useState(false)
   const [hoveredPartName, setHoveredPartName] = useState<string | null>(null)
-  useEffect(() => () => useGLTF.clear(url), [url])
+  useEffect(() => {
+    // Start the GLB download outside of render so the progress store is
+    // never updated synchronously while the loading fallback is mounted.
+    useGLTF.preload(url)
+    return () => useGLTF.clear(url)
+  }, [url])
 
   return (
     <div className={`relative h-80 overflow-hidden rounded-xl border bg-muted/30 sm:h-[30rem] ${hovered ? "cursor-pointer" : "cursor-default"}`}>
