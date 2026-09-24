@@ -515,7 +515,7 @@ function ProjectView({
 
             {selectedPart ? (
               <Card>
-                <CardHeader className="flex-row items-start justify-between gap-3">
+                <CardHeader className="!flex flex-row items-start justify-between gap-3">
                   <div className="min-w-0">
                     <CardTitle className="truncate uppercase">{selectedPart.name}</CardTitle>
                     <CardDescription className="space-y-1">
