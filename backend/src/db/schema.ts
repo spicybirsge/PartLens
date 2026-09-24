@@ -92,3 +92,31 @@ export const partManualsTable = pgTable("part_manuals", {
 }, (table) => ({
   partIdIdx: index("part_pdfs_part_id_idx").on(table.partId),
 }));
+
+export const projectBookmarksTable = pgTable("project_bookmarks", {
+  id: uuid("id").primaryKey().default(sql`uuidv7()`),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projectTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("project_bookmarks_user_id_idx").on(table.userId),
+  userProjectUnique: uniqueIndex("project_bookmarks_user_id_project_id_unique").on(table.userId, table.projectId),
+}));
+
+export const partBookmarksTable = pgTable("part_bookmarks", {
+  id: uuid("id").primaryKey().default(sql`uuidv7()`),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  partId: uuid("part_id")
+    .notNull()
+    .references(() => partsTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("part_bookmarks_user_id_idx").on(table.userId),
+  userPartUnique: uniqueIndex("part_bookmarks_user_id_part_id_unique").on(table.userId, table.partId),
+}));
