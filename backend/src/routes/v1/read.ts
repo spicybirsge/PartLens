@@ -348,10 +348,15 @@ router.get('/project/:publicId/meta', async (req, res) => {
                 });
         }
 
+        const [viewCount] = await database
+                .select({ views: count() })
+                .from(projectViewsTable)
+                .where(eq(projectViewsTable.projectId, project.id));
+
         return res.status(200).json({
                 success: true,
                 message: "Project meta retrieved",
-                data: project,
+                data: { ...project, views: Number(viewCount?.views ?? 0) },
                 code: 200,
         });
 });
