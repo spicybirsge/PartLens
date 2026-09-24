@@ -2,8 +2,9 @@ import express from "express"
 import verifySession from "../../middleware/verifySession.js";
 import { validate } from "../../middleware/validate.js";
 import { deleteManualValidator, deletePartValidator } from "../../validators/manual.validator.js";
+import { deleteProjectBookmarkValidator, deletePartBookmarkValidator } from "../../validators/bookmark.validator.js";
 import { database } from "../../db/index.js";
-import { partManualsTable, partsTable, projectTable } from "../../db/schema.js";
+import { partManualsTable, partsTable, projectTable, projectBookmarksTable, partBookmarksTable } from "../../db/schema.js";
 import { and, eq } from "drizzle-orm";
 
 const router = express.Router()
@@ -116,6 +117,94 @@ router.delete('/manual/:manualId', verifySession, validate(deleteManualValidator
     success: true,
     message: "Manual deleted",
     data: { id: deletedManual.id },
+    code: 200,
+  });
+});
+
+
+router.delete('/bookmark/project/:publicId', verifySession, validate(deleteProjectBookmarkValidator), async (req, res) => {
+  const { publicId } = req.params;
+  if (typeof publicId !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid project identifier",
+      data: null,
+      code: 400,
+    });
+  }
+
+  const [project] = await database
+    .select({ id: projectTable.id })
+    .from(projectTable)
+    .where(eq(projectTable.publicId, publicId))
+    .limit(1);
+
+  if (!project) {
+    return res.status(404).json({
+      success: false,
+      message: "Project not found",
+      data: null,
+      code: 404,
+    });
+  }
+
+  const [deleted] = await database
+    .delete(projectBookmarksTable)
+    .where(and(
+      eq(projectBookmarksTable.userId, req.user!.id),
+      eq(projectBookmarksTable.projectId, project.id),
+    ))
+    .returning({ id: projectBookmarksTable.id });
+
+  if (!deleted) {
+    return res.status(404).json({
+      success: false,
+      message: "Project bookmark not found",
+      data: null,
+      code: 404,
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Project bookmark removed",
+    data: { id: deleted.id },
+    code: 200,
+  });
+});
+
+router.delete('/bookmark/part/:partId', verifySession, validate(deletePartBookmarkValidator), async (req, res) => {
+  const { partId } = req.params;
+  if (typeof partId !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid part identifier",
+      data: null,
+      code: 400,
+    });
+  }
+
+  const [deleted] = await database
+    .delete(partBookmarksTable)
+    .where(and(
+      eq(partBookmarksTable.userId, req.user!.id),
+      eq(partBookmarksTable.partId, partId),
+    ))
+    .returning({ id: partBookmarksTable.id });
+
+  if (!deleted) {
+    return res.status(404).json({
+      success: false,
+      message: "Part bookmark not found",
+      data: null,
+      code: 404,
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Part bookmark removed",
+    data: { id: deleted.id },
     code: 200,
   });
 });

@@ -5,7 +5,8 @@ import { nanoid } from "nanoid"
 import { validate } from '../../middleware/validate.js';
 import { createProjectValidator } from "../../validators/project.validator.js";
 import { createManualValidator, createPartManualValidator } from "../../validators/manual.validator.js";
-import { partManualsTable, partsTable, projectTable } from "../../db/schema.js";
+import { createProjectBookmarkValidator, createPartBookmarkValidator } from "../../validators/bookmark.validator.js";
+import { partManualsTable, partsTable, projectTable, projectBookmarksTable, partBookmarksTable } from "../../db/schema.js";
 import { database } from "../../db/index.js";
 import { and, eq } from "drizzle-orm";
 
@@ -153,6 +154,89 @@ router.post('/manual', verifySession, validate(createPartManualValidator), async
                 message: "Manual created successfully",
                 data: manual,
                 code: 201,
+        });
+});
+
+
+router.post('/bookmark/project', verifySession, validate(createProjectBookmarkValidator), async (req, res) => {
+        const { public_id } = req.body;
+
+        const [project] = await database
+                .select({ id: projectTable.id })
+                .from(projectTable)
+                .where(eq(projectTable.publicId, public_id))
+                .limit(1);
+
+        if (!project) {
+                return res.status(404).json({
+                        success: false,
+                        message: "Project not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        const [bookmark] = await database
+                .insert(projectBookmarksTable)
+                .values({ userId: req.user!.id, projectId: project.id })
+                .onConflictDoNothing()
+                .returning();
+
+        return res.status(200).json({
+                success: true,
+                message: bookmark ? "Project bookmarked" : "Project already bookmarked",
+                data: bookmark ?? null,
+                code: 200,
+        });
+});
+
+router.post('/bookmark/part', verifySession, validate(createPartBookmarkValidator), async (req, res) => {
+        const { public_id, part_id } = req.body;
+
+        const [project] = await database
+                .select({ id: projectTable.id })
+                .from(projectTable)
+                .where(eq(projectTable.publicId, public_id))
+                .limit(1);
+
+        if (!project) {
+                return res.status(404).json({
+                        success: false,
+                        message: "Project not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        const [part] = await database
+                .select({ id: partsTable.id })
+                .from(partsTable)
+                .where(and(
+                        eq(partsTable.id, part_id),
+                        eq(partsTable.projectId, project.id),
+                ))
+                .limit(1);
+
+        if (!part) {
+                return res.status(404).json({
+                        success: false,
+                        message: "Part not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        const [bookmark] = await database
+                .insert(partBookmarksTable)
+                .values({ userId: req.user!.id, partId: part.id })
+                .onConflictDoNothing()
+                .returning();
+
+        return res.status(200).json({
+                success: true,
+                message: bookmark ? "Part bookmarked" : "Part already bookmarked",
+                data: bookmark ?? null,
+                code: 200,
         });
 });
 
