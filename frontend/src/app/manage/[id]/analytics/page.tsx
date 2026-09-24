@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Project Analytics",
   description:
-    "Analyze your PartLens project",
+    "View analytics of your PartLens project",
 };
 
 import ProjectAnalytics from "@/components/project-analytics/ProjectAnalytics";

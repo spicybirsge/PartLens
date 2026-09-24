@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Box, Plus, Search, UploadCloud } from "lucide-react"
+import { Plus, Search } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,9 +18,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { userStore } from "@/store/store"
 import vars from "@/vars/vars"
+import ProjectCard from "@/components/projects/ProjectCard"
 import {
-  getProjectColor,
-  timeAgo,
   type Project,
   type Stats,
 } from "@/lib/projects"
@@ -236,46 +235,9 @@ export default function DashboardHome() {
           <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredProjects.map((project) => (
               <Link href={`/manage/${project.publicId}`} key={project.id} className="block min-w-0">            
-              <Card
-                className="cursor-pointer transition-shadow hover:shadow-md min-w-0"
-              >
-                <CardHeader className="min-w-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div
-                      className={`flex size-10 items-center justify-center rounded-lg shrink-0 ${getProjectColor(project.publicId)}`}
-                    >
-                      <Box className="size-5" />
-                    </div>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0 ${
-                        project.unlisted
-                          ? "bg-muted text-muted-foreground"
-                          : "bg-emerald-500/10 text-emerald-600"
-                      }`}
-                    >
-                      {project.unlisted ? "Unlisted" : "Public"}
-                    </span>
-                  </div>
-                  <CardTitle className="pt-2 truncate" title={project.name}>
-                    {project.name}
-                  </CardTitle>
-                  <CardDescription className="truncate">
-                    Updated {timeAgo(project.updatedAt)}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span>{project.parts} parts</span>
-                  <span>{project.views} views</span>
-                  {project.glbFileUrl && (
-                    <span className="ml-auto inline-flex items-center gap-1">
-                      <UploadCloud className="size-3.5" />
-                      GLB
-                    </span>
-                  )}
-                </CardContent>
-              </Card>
+                <ProjectCard project={project} />
               </Link>
- 
+
             ))}
           </section>
         )}
