@@ -307,6 +307,55 @@ router.get('/project/:publicId/parts', verifySession, async (req, res) => {
         });
 });
 
+router.get('/project/:publicId/meta', async (req, res) => {
+        const { publicId } = req.params;
+        if (typeof publicId !== "string") {
+                return res.status(400).json({
+                        success: false,
+                        message: "Invalid project identifier",
+                        data: null,
+                        code: 400,
+                });
+        }
+
+        const [project] = await database
+                .select({
+                        id: projectTable.id,
+                        publicId: projectTable.publicId,
+                        name: projectTable.name,
+                        description: projectTable.description,
+                        unlisted: projectTable.unlisted,
+                        createdAt: projectTable.createdAt,
+                        updatedAt: projectTable.updatedAt,
+                        owner: {
+                                id: usersTable.id,
+                                username: usersTable.username,
+                                name: usersTable.name,
+                                avatarUrl: usersTable.avatarUrl,
+                        },
+                })
+                .from(projectTable)
+                .innerJoin(usersTable, eq(projectTable.userId, usersTable.id))
+                .where(eq(projectTable.publicId, publicId))
+                .limit(1);
+
+        if (!project) {
+                return res.status(404).json({
+                        success: false,
+                        message: "Project not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        return res.status(200).json({
+                success: true,
+                message: "Project meta retrieved",
+                data: project,
+                code: 200,
+        });
+});
+
 router.get('/project/:publicId', isAuthenticated, async (req, res) => {
         const { publicId } = req.params;
         if (typeof publicId !== "string") {
