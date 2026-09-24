@@ -95,6 +95,30 @@ export default function SettingsPage() {
         [user?.name, user?.username]
     )
 
+    const hasProfileChanges = useMemo(() => {
+        if (!user) return false
+        return (
+            name !== user.name ||
+            username !== user.username ||
+            selectedImage !== null ||
+            selectedImageFile !== null ||
+            removeImage
+        )
+    }, [user, name, username, selectedImage, selectedImageFile, removeImage])
+
+    const handleDiscardChanges = () => {
+        if (!user) return
+        if (selectedImage) URL.revokeObjectURL(selectedImage)
+        setName(user.name)
+        setUsername(user.username)
+        setFieldErrors({})
+        setSelectedImage(null)
+        setSelectedImageFile(null)
+        setRemoveImage(false)
+        setCropOpen(false)
+        if (imageInputRef.current) imageInputRef.current.value = ""
+    }
+
     const fetchSessions = async () => {
         const currentToken = localStorage.getItem("token")
         if (!currentToken) return
@@ -320,7 +344,7 @@ export default function SettingsPage() {
                             <form className="space-y-5" onSubmit={handleProfileSubmit}>
                                 <div className="flex flex-col items-start gap-4 rounded-lg border bg-muted/30 p-4 sm:flex-row sm:items-center">
                                     <Avatar size="lg">
-                                        <AvatarImage src={selectedImage || user.avatarUrl || undefined} alt={user.name} />
+                                        <AvatarImage src={selectedImage || (!removeImage ? user.avatarUrl || undefined : undefined)} alt={user.name} />
                                         <AvatarFallback>{initials}</AvatarFallback>
                                     </Avatar>
                                     <div className="min-w-0">
@@ -338,7 +362,7 @@ export default function SettingsPage() {
                                         <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => imageInputRef.current?.click()}>
                                             <ImagePlus /> Change avatar
                                         </Button>
-                                        {(user.avatarUrl || selectedImage) && (
+                                        {(user.avatarUrl || selectedImage) && !removeImage && (
                                             <Button type="button" variant="ghost" size="sm" className="w-full sm:w-auto" onClick={handleRemoveImage}>
                                                 <Trash2 /> Remove
                                             </Button>
@@ -378,10 +402,17 @@ export default function SettingsPage() {
                                         <span className="h-4 text-xs font-normal text-destructive">{fieldErrors.username || "\u00a0"}</span>
                                     </label>
                                 </div>
-                                <Button type="submit" disabled={isSaving}>
-                                    {isSaving && <Loader2 className="animate-spin" />}
-                                    {isSaving ? "Saving..." : "Save changes"}
-                                </Button>
+                                <div className="flex flex-col gap-2 sm:flex-row">
+                                    <Button type="submit" disabled={isSaving}>
+                                        {isSaving && <Loader2 className="animate-spin" />}
+                                        {isSaving ? "Saving..." : "Save changes"}
+                                    </Button>
+                                    {hasProfileChanges && !isSaving && (
+                                        <Button type="button" variant="outline" onClick={handleDiscardChanges}>
+                                            Discard changes
+                                        </Button>
+                                    )}
+                                </div>
                             </form>
                         </CardContent>
                     </Card>
