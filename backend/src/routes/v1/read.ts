@@ -1,8 +1,9 @@
 import express from "express"
 import { and, count, eq, gte, inArray, desc } from "drizzle-orm";
 import { database } from "../../db/index.js";
-import { partsTable, partManualsTable, projectTable, projectViewsTable, usersTable } from "../../db/schema.js";
+import { partsTable, partManualsTable, projectTable, projectViewsTable, usersTable, projectBookmarksTable, partBookmarksTable } from "../../db/schema.js";
 import verifySession from "../../middleware/verifySession.js";
+import isAuthenticated from "../../middleware/isAuthenticated.js";
 
 const router = express.Router()
 
@@ -303,7 +304,7 @@ router.get('/project/:publicId/parts', verifySession, async (req, res) => {
         });
 });
 
-router.get('/project/:publicId', async (req, res) => {
+router.get('/project/:publicId', isAuthenticated, async (req, res) => {
         const { publicId } = req.params;
         if (typeof publicId !== "string") {
                 return res.status(400).json({
@@ -368,12 +369,45 @@ router.get('/project/:publicId', async (req, res) => {
                 }
         }
 
+        let projectBookmarked = false;
+        const bookmarkedPartIds = new Set<string>();
+
+        if (req.isAuthenticated && req.user) {
+                const userId = req.user.id;
+
+                const [projectBookmark] = await database
+                        .select({ id: projectBookmarksTable.id })
+                        .from(projectBookmarksTable)
+                        .where(and(
+                                eq(projectBookmarksTable.userId, userId),
+                                eq(projectBookmarksTable.projectId, project.id),
+                        ))
+                        .limit(1);
+                projectBookmarked = Boolean(projectBookmark);
+
+                const partIds = Array.from(parts.keys());
+                if (partIds.length > 0) {
+                        const partBookmarks = await database
+                                .select({ partId: partBookmarksTable.partId })
+                                .from(partBookmarksTable)
+                                .where(and(
+                                        eq(partBookmarksTable.userId, userId),
+                                        inArray(partBookmarksTable.partId, partIds),
+                                ));
+                        for (const bookmark of partBookmarks) {
+                                bookmarkedPartIds.add(bookmark.partId);
+                        }
+                }
+        }
+
         const data = {
                 ...project,
+                bookmarked: projectBookmarked,
                 owner: projectRows[0].owner,
                 views: Number(viewCount.views),
                 parts: Array.from(parts.values()).map((part) => ({
                         ...part,
+                        bookmarked: bookmarkedPartIds.has(part.id),
                         manuals: manualsByPart.get(part.id) ?? [],
                 })),
         };
