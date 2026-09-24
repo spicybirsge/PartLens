@@ -1,4 +1,4 @@
-import { body, param } from "express-validator";
+import { body, param, query } from "express-validator";
 
 export const createProjectBookmarkValidator = [
   body("public_id")
@@ -36,4 +36,21 @@ export const deleteProjectBookmarkValidator = [
 export const deletePartBookmarkValidator = [
   param("partId")
     .isUUID("all").withMessage("partId must be a valid UUID"),
+];
+
+export const listBookmarksValidator = [
+  query("type")
+    .exists({ checkFalsy: true }).withMessage("type is required")
+    .bail()
+    .isIn(["parts", "projects"]).withMessage("type must be 'parts' or 'projects'"),
+
+  query("cursor")
+    .optional()
+    .isString().withMessage("cursor must be a string")
+    .bail()
+    .isUUID("all").withMessage("cursor must be a valid UUID"),
+
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 50 }).withMessage("limit must be an integer between 1 and 50"),
 ];

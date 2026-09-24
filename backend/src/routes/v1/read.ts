@@ -1,9 +1,11 @@
 import express from "express"
-import { and, count, eq, gte, inArray, desc } from "drizzle-orm";
+import { and, count, eq, gte, inArray, desc, lt } from "drizzle-orm";
 import { database } from "../../db/index.js";
 import { partsTable, partManualsTable, projectTable, projectViewsTable, usersTable, projectBookmarksTable, partBookmarksTable } from "../../db/schema.js";
 import verifySession from "../../middleware/verifySession.js";
 import isAuthenticated from "../../middleware/isAuthenticated.js";
+import { validate } from "../../middleware/validate.js";
+import { listBookmarksValidator } from "../../validators/bookmark.validator.js";
 
 const router = express.Router()
 
@@ -432,5 +434,106 @@ router.get('/project/:publicId', isAuthenticated, async (req, res) => {
 
 
 
+
+router.get('/bookmarks', verifySession, validate(listBookmarksValidator), async (req, res) => {
+        const type = req.query.type;
+        if (typeof type !== "string" || (type !== "parts" && type !== "projects")) {
+                return res.status(400).json({
+                        success: false,
+                        message: "Invalid bookmark type",
+                        data: null,
+                        errors: ["type must be 'parts' or 'projects'"],
+                        code: 400,
+                });
+        }
+
+        const rawCursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+        const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
+
+        const userId = req.user!.id;
+
+        if (type === "projects") {
+                const conditions = [eq(projectBookmarksTable.userId, userId)];
+                if (rawCursor) {
+                        conditions.push(lt(projectBookmarksTable.id, rawCursor));
+                }
+
+                const rows = await database
+                        .select({
+                                id: projectBookmarksTable.id,
+                                createdAt: projectBookmarksTable.createdAt,
+                                project: {
+                                        id: projectTable.id,
+                                        publicId: projectTable.publicId,
+                                        name: projectTable.name,
+                                        description: projectTable.description,
+                                        glbFileUrl: projectTable.glbFileUrl,
+                                        unlisted: projectTable.unlisted,
+                                        createdAt: projectTable.createdAt,
+                                        updatedAt: projectTable.updatedAt,
+                                },
+                        })
+                        .from(projectBookmarksTable)
+                        .innerJoin(projectTable, eq(projectBookmarksTable.projectId, projectTable.id))
+                        .where(and(...conditions))
+                        .orderBy(desc(projectBookmarksTable.id))
+                        .limit(limit + 1);
+
+                const { items, hasMore, nextCursor } = paginate(rows, limit);
+
+                return res.status(200).json({
+                        success: true,
+                        message: "Project bookmarks retrieved",
+                        data: { items, nextCursor, hasMore },
+                        code: 200,
+                });
+        }
+
+        const conditions = [eq(partBookmarksTable.userId, userId)];
+        if (rawCursor) {
+                conditions.push(lt(partBookmarksTable.id, rawCursor));
+        }
+
+        const rows = await database
+                .select({
+                        id: partBookmarksTable.id,
+                        createdAt: partBookmarksTable.createdAt,
+                        part: {
+                                id: partsTable.id,
+                                partNumber: partsTable.partNumber,
+                                name: partsTable.name,
+                                description: partsTable.description,
+                                createdAt: partsTable.createdAt,
+                                updatedAt: partsTable.updatedAt,
+                        },
+                        project: {
+                                id: projectTable.id,
+                                publicId: projectTable.publicId,
+                                name: projectTable.name,
+                        },
+                })
+                .from(partBookmarksTable)
+                .innerJoin(partsTable, eq(partBookmarksTable.partId, partsTable.id))
+                .innerJoin(projectTable, eq(partsTable.projectId, projectTable.id))
+                .where(and(...conditions))
+                .orderBy(desc(partBookmarksTable.id))
+                .limit(limit + 1);
+
+        const { items, hasMore, nextCursor } = paginate(rows, limit);
+
+        return res.status(200).json({
+                success: true,
+                message: "Part bookmarks retrieved",
+                data: { items, nextCursor, hasMore },
+                code: 200,
+        });
+});
+
+const paginate = <T extends { id: string }>(rows: T[], limit: number) => {
+        const hasMore = rows.length > limit;
+        const items = hasMore ? rows.slice(0, limit) : rows;
+        const last = items[items.length - 1];
+        return { items, hasMore, nextCursor: hasMore && last ? last.id : null };
+};
 
 export default router
