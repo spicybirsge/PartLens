@@ -436,15 +436,15 @@ function ProjectView({
 
         {project && !loading && (
           <div className="mb-6 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <Link href={`/profile/${project.owner.username}`} className="shrink-0" aria-label={`${project.owner.name} profile`}>
+            <Link href={`/user/${project.owner.username}`} className="shrink-0" aria-label={`${project.owner.name} profile`}>
               <Avatar size="sm">
                 <AvatarImage src={project.owner.avatarUrl || undefined} alt={project.owner.name} />
                 <AvatarFallback>{ownerInitials}</AvatarFallback>
               </Avatar>
             </Link>
             <span className="min-w-0">
-              by{" "}
-              <Link href={`/profile/${project.owner.username}`} className="font-medium text-foreground hover:underline">
+              {" "}
+              <Link href={`/user/${project.owner.username}`} className="font-medium text-foreground hover:underline">
                 {project.owner.name}
               </Link>{" "}
               (@{project.owner.username})

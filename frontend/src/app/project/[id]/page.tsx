@@ -68,7 +68,7 @@ export async function generateMetadata({
     authors: [
       {
         name: `${project.owner.name} (@${project.owner.username})`,
-        url: `${vars.FRONTEND_URL}/profile/${project.owner.username}`,
+        url: `${vars.FRONTEND_URL}/user/${project.owner.username}`,
       },
     ],
     alternates: {
