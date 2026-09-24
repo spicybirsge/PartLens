@@ -6,6 +6,7 @@ import verifySession from "../../middleware/verifySession.js";
 import isAuthenticated from "../../middleware/isAuthenticated.js";
 import { validate } from "../../middleware/validate.js";
 import { listBookmarksValidator } from "../../validators/bookmark.validator.js";
+import { paginate } from "../../lib/pagination.js";
 
 const router = express.Router()
 
@@ -528,12 +529,5 @@ router.get('/bookmarks', verifySession, validate(listBookmarksValidator), async 
                 code: 200,
         });
 });
-
-const paginate = <T extends { id: string }>(rows: T[], limit: number) => {
-        const hasMore = rows.length > limit;
-        const items = hasMore ? rows.slice(0, limit) : rows;
-        const last = items[items.length - 1];
-        return { items, hasMore, nextCursor: hasMore && last ? last.id : null };
-};
 
 export default router
