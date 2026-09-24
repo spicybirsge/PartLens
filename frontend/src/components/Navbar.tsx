@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { SiGithub } from "@icons-pack/react-simple-icons"
+import { FileText, Shield } from "lucide-react"
 import { Menu, Scale, X } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -72,12 +73,12 @@ export default function Navbar() {
                 </Button>
               }
             />
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-max">
               <DropdownMenuItem render={<Link href="/terms" />}>
-                Terms of Service
+                <FileText></FileText>Terms of Service
               </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/privacy" />}>
-                Privacy Policy
+                <Shield></Shield>Privacy Policy
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -135,12 +136,12 @@ export default function Navbar() {
                   </Button>
                 }
               />
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-max">
                 <DropdownMenuItem render={<Link href="/terms" />}>
-                  Terms of Service
+                  <FileText></FileText>Terms of Service
                 </DropdownMenuItem>
                 <DropdownMenuItem render={<Link href="/privacy" />}>
-                  Privacy Policy
+                  <Shield></Shield>Privacy Policy
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
