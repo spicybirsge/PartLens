@@ -71,7 +71,7 @@ export default function PartBookmarkCard({
       </CardHeader>
       <CardContent className="min-w-0 space-y-2 text-xs text-muted-foreground">
         <p className="min-w-0 truncate">
-          {part.description?.trim() || "No part description provided."}
+          {part.description?.trim() || "No description"}
         </p>
         <div className="flex items-center justify-between gap-2 pt-1">
           <span className="min-w-0 truncate">

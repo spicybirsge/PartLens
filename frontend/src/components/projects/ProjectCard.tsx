@@ -87,7 +87,7 @@ export default function ProjectCard({ project, onOpen, action }: ProjectCardProp
         ) : (
           <div className="flex items-start gap-2">
             <p className="min-w-0 flex-1 truncate">
-              {project.description?.trim() || "No description provided."}
+              {project.description?.trim() || "No description"}
             </p>
             {project.glbFileUrl && (
               <span className="inline-flex shrink-0 items-center gap-1">
