@@ -111,9 +111,10 @@ export default function InteractiveGlbViewer({
         <color attach="background" args={["#eef2f6"]} />
         <ambientLight intensity={1.1} />
         <directionalLight position={[5, 5, 5]} intensity={1.7} />
-        <Environment preset="studio" />
+       
         <ViewerErrorBoundary onError={onError}>
           <Suspense fallback={<ViewerLoading />}>
+           <Environment preset="studio" />
             <Bounds fit clip margin={1.35}>
               <InteractiveModel
                 url={url}
