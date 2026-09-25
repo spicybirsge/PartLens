@@ -345,7 +345,7 @@ export default function DiscoverPage({
             }
             endMessage={
               <p className="py-8 text-center text-xs text-muted-foreground">
-                You have reached the end of these projects.
+                You have reached the end.
               </p>
             }
           >
