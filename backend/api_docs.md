@@ -1,11 +1,11 @@
 # PartLens Backend API Documentation
 
-> **Version:** 1.0.0  
-> **Base URL:** `http://localhost:5050/api/v1`  
-> **Protocol:** HTTPS (in production)  
-> **Authentication:** Bearer session tokens (opaque random tokens stored server-side; not JWTs)
-> **Database:** PostgreSQL via Drizzle ORM  
-> **Cache:** Redis  
+> **Version:** 1.0.0
+> **Base URL:** `http://localhost:5050/api/v1`
+> **Health endpoint:** `GET http://localhost:5050/status` (root, not under `/api/v1`)
+> **Authentication:** Bearer session tokens (opaque random tokens, SHA-256 hashed server-side; not JWTs)
+> **Database:** PostgreSQL via Drizzle ORM
+> **Redis:** OAuth state/callback tokens + rate-limit counters (not a cache)
 > **File Storage:** ImageKit
 
 ---
@@ -16,68 +16,94 @@
 - [Authentication](#authentication)
 - [Health Check](#health-check)
 - [Projects](#projects)
-- [Parts](#parts)
-- [Manuals](#manuals)
+- [Parts & Manuals](#parts--manuals)
+- [Bookmarks](#bookmarks)
+- [Users](#users)
 - [File Upload](#file-upload)
+- [Rate Limiting](#rate-limiting)
 - [Error Responses](#error-responses)
 - [Database Schema](#database-schema)
 - [Environment Variables](#environment-variables)
 - [Middleware](#middleware)
 - [Validators](#validators)
+- [Running the Backend](#running-the-backend)
 
 ---
 
 ## Architecture Overview
 
-Session authentication uses opaque random bearer tokens stored server-side;
-these tokens are not JWTs.
+Session authentication uses opaque random bearer tokens stored server-side as
+SHA-256 hashes; these tokens are not JWTs.
 
 The backend is an **Express 5** server written in **TypeScript (ESM)** using the following stack:
 
 | Component | Technology |
 |---|---|
 | Framework | Express 5 |
-| ORM | Drizzle ORM |
-| Database | PostgreSQL |
-| Cache | Redis |
-| File Upload | Multer → ImageKit |
-| Auth | Google OAuth 2.0 + Session Tokens |
+| ORM | Drizzle ORM (`drizzle-orm/node-postgres`, `pg` Pool) |
+| Database | PostgreSQL (migrations in `./drizzle`, applied on boot) |
+| Redis | `redis` client — OAuth state/callback tokens, `express-rate-limit` + `rate-limit-redis` counters |
+| File Upload | Multer (memory storage) → ImageKit (`@imagekit/nodejs`) |
+| Auth | Google OAuth 2.0 + server-side sessions |
 | Validation | express-validator |
-| Logging | Morgan |
+| Logging | Morgan (`combined`) |
+| Misc | `cors()`, `nanoid`, `express.json()` / `urlencoded({ extended: false })` |
+
+`trust proxy` is enabled only when `NODE_ENV=production`. Responses use
+`json spaces: 1`. Unmatched routes return `404 { success: false, message:
+"No matching route found.", code: 404 }`.
 
 ### Project Structure
 
 ```
 backend/
 ├── src/
-│   ├── index.ts                  # Entry point, routes mounting, middleware setup
+│   ├── index.ts                  # Entry point, route mounting, /status, 404, error handler
 │   ├── db/
-│   │   ├── index.ts              # Drizzle pool & migration runner
-│   │   └── schema.ts             # All table definitions
+│   │   ├── index.ts              # pg Pool, drizzle instance, initializeDatabase() (SELECT 1 + migrate)
+│   │   └── schema.ts             # users, sessions, projects, project_views, parts, part_manuals, *_bookmarks
 │   ├── middleware/
-│   │   ├── verifySession.ts      # Bearer token → session/user resolution
-│   │   ├── isAdminRequest.ts     # ADMIN_KEY timing-safe compare
+│   │   ├── verifySession.ts      # Required Bearer session auth
+│   │   ├── isAuthenticated.ts    # Optional (non-blocking) session auth
+│   │   ├── isAdminRequest.ts     # ADMIN_KEY timing-safe compare for /status
 │   │   ├── validate.ts           # express-validator runner
+│   │   ├── ratelimits.ts         # auth / general / upload Redis rate limiters
 │   │   └── errorHandler.ts       # Generic 500 handler
 │   ├── routes/v1/
-│   │   ├── auth.ts               # Google OAuth, session management
-│   │   ├── create.ts             # POST /project, /part, /manual
-│   │   ├── read.ts               # GET /projects, /project/:id/*
-│   │   ├── update.ts             # PATCH /project/:id, /manual/:partId
-│   │   ├── delete.ts             # DELETE /project/:id, /part/:id, /manual/:id
+│   │   ├── auth.ts               # Google OAuth, obtain-session, me, logout, sessions
+│   │   ├── create.ts             # POST /project, /part, /manual, /bookmark/project, /bookmark/part
+│   │   ├── read.ts               # GET /user, /user/projects, /projects, /search/projects,
+│   │   │                         #     /projects/discover, /project/:publicId/{details,analytics,parts,meta},
+│   │   │                         #     /project/:publicId, /bookmarks
+│   │   ├── update.ts             # PATCH /project/:publicId, /manual/:partId (updates a part), /user
+│   │   ├── delete.ts             # DELETE /project/:publicId, /part/:partId, /manual/:manualId,
+│   │   │                         #        /bookmark/project/:publicId, /bookmark/part/:partId
 │   │   └── upload.ts             # POST /upload/{glb,pdf,image}
 │   ├── validators/
-│   │   ├── project.validator.ts  # Project create/update validators
-│   │   └── manual.validator.ts   # Part/manual validators
+│   │   ├── project.validator.ts  # create/update/search/discover project validators
+│   │   ├── manual.validator.ts   # create part+manuals / single manual / update/delete validators
+│   │   ├── bookmark.validator.ts # bookmark create/delete/list validators
+│   │   └── user.validator.ts     # update user / get profile / get user-projects validators
+│   ├── lib/
+│   │   ├── escapeLike.ts         # escape \, %, _ for LIKE/ILIKE
+│   │   └── pagination.ts         # paginate() (keyset id DESC) + paginateOffset() (offset)
 │   ├── redis/
-│   │   └── redisClient.ts        # Redis client setup
+│   │   └── redisClient.ts        # redis client from REDIS_URL
 │   └── types/
-│       └── express.d.ts          # Express Request type augmentation
+│       └── express.d.ts          # req.user / req.session / req.isAdmin / req.isAuthenticated
 ├── drizzle/                      # Migration files
-├── .env                          # Environment configuration
+├── .env                          # Environment configuration (see .env.example)
 ├── package.json
 └── tsconfig.json
 ```
+
+Route mounting (`src/index.ts`):
+
+| Mount | Rate limiter |
+|---|---|
+| `/api/v1/auth` | `authRateLimit` (20 / 15 min per IP) |
+| `/api/v1/create`, `/delete`, `/read`, `/update`, `/upload` | `generalRateLimit` (300 / min per IP) |
+| `POST /api/v1/upload/{glb,pdf,image}` | additionally `uploadRateLimit` (20 / hour per user) |
 
 ---
 
@@ -86,12 +112,12 @@ backend/
 ### Google OAuth Flow
 
 1. **Frontend** redirects user to `GET /api/v1/auth/google`
-2. Backend generates a **32-byte random state**, stores it in Redis with a **10-minute TTL**, and redirects to Google's OAuth consent screen
+2. Backend generates **32 random bytes, hex-encoded (64 chars)**, stores `1` in Redis at `${REDIS_PREFIX}:auth:state:<state>` with a **600-second (10-minute) TTL**, and redirects to Google's OAuth consent screen (`prompt=select_account`, `scope="openid email profile"`, `redirect_uri=${BACKEND_URL}/api/v1/auth/google/callback`)
 3. Google redirects back to `GET /api/v1/auth/google/callback` with `code` and `state`
-4. Backend validates the state against Redis, exchanges the code for tokens, fetches the user profile
-5. A **new session** is created in PostgreSQL (30-day expiry) and a **callback token** is stored in Redis (60-second TTL)
-6. Frontend is redirected to `/auth/callback?code=<callbackToken>`
-7. Frontend exchanges the callback token for a session token via `POST /api/v1/auth/obtain-session`
+4. Backend validates single-use state against Redis (deletes it), exchanges the code at `https://oauth2.googleapis.com/token`, fetches the profile at `https://www.googleapis.com/oauth2/v3/userinfo`
+5. Existing user is looked up by `googleId = profile.sub`; otherwise a user is created with `email`, `emailVerified`, `name`, `avatarUrl = profile.picture`, `username = nanoid()` (21-char default). A session row is created (30-day expiry); the session token is **64 random bytes (`base64url`)** stored as SHA-256 hex. A callback token (**32 random bytes, `base64url`**) is stored in Redis at `${REDIS_PREFIX}:auth:callback:<token>` with a **60-second TTL**
+6. Frontend is redirected to `${FRONTEND_URL}/auth/callback?code=<callbackToken>`
+7. Frontend exchanges the callback token for the session token via `POST /api/v1/auth/obtain-session` (key is deleted on use)
 
 ### Obtain Session Token
 
@@ -105,7 +131,7 @@ POST /api/v1/auth/obtain-session
 |---|---|---|
 | `callback_code` | string | The callback token received from the OAuth redirect |
 
-**Response:**
+**Response (200):**
 
 ```json
 {
@@ -116,17 +142,14 @@ POST /api/v1/auth/obtain-session
 }
 ```
 
-**Error Response:**
+**Error Responses:**
 
-```json
-{
-  "success": false,
-  "message": "invalid callback code",
-  "code": 400
-}
-```
+| Code | Message | Cause |
+|---|---|---|
+| 400 | `"invalid request"` | Missing `callback_code` |
+| 400 | `"invalid callback code"` | Unknown/expired callback token |
 
-> The returned `token` must be used as a **Bearer token** in the `Authorization` header for all subsequent requests.
+> The returned `token` must be used as a **Bearer token** in the `Authorization` header for all subsequent authenticated requests. Callback codes are single-use.
 
 ### Start Google OAuth
 
@@ -134,8 +157,8 @@ POST /api/v1/auth/obtain-session
 GET /api/v1/auth/google
 ```
 
-No authentication is required. This endpoint creates a short-lived OAuth
-state in Redis and redirects the browser to Google's OAuth consent screen.
+No authentication required. Creates the Redis OAuth state (600 s TTL) and
+returns a `302` redirect to `https://accounts.google.com/o/oauth2/v2/auth?...`.
 
 ### Google OAuth Callback
 
@@ -143,10 +166,14 @@ state in Redis and redirects the browser to Google's OAuth consent screen.
 GET /api/v1/auth/google/callback?code=<google_code>&state=<oauth_state>
 ```
 
-Google calls this endpoint after consent. On success, the backend creates a
+Google calls this endpoint after consent. On success the backend creates a
 30-day session, stores a one-time callback code in Redis for 60 seconds, and
-redirects to `<FRONTEND_URL>/auth/callback?code=<callback_code>`. Missing or
-invalid `code` or `state` values return `400`.
+returns a `302` redirect to `<FRONTEND_URL>/auth/callback?code=<callback_code>`.
+
+| Code | Message | Cause |
+|---|---|---|
+| 400 | `"invalid request"` | Missing `code` or `state` |
+| 400 | `"invalid state"` | Unknown/expired/reused state |
 
 ### Get Current User
 
@@ -160,7 +187,7 @@ GET /api/v1/auth/me
 Authorization: Bearer <session_token>
 ```
 
-**Response:**
+**Response (200):**
 
 ```json
 {
@@ -187,7 +214,9 @@ POST /api/v1/auth/logout
 
 **Headers:** `Authorization: Bearer <session_token>`
 
-**Response:**
+Deletes only the current session row.
+
+**Response (200):**
 
 ```json
 {
@@ -205,7 +234,9 @@ POST /api/v1/auth/logout-all
 
 **Headers:** `Authorization: Bearer <session_token>`
 
-**Response:**
+Deletes every session of the same user except the current one.
+
+**Response (200):**
 
 ```json
 {
@@ -223,7 +254,7 @@ GET /api/v1/auth/sessions
 
 **Headers:** `Authorization: Bearer <session_token>`
 
-**Response:**
+**Response (200):**
 
 ```json
 {
@@ -244,32 +275,40 @@ GET /api/v1/auth/sessions
 }
 ```
 
-> Expired sessions are automatically purged on this request. The `current` field marks the session making the request.
+> Expired sessions of the user are deleted before the list is built. The
+> `current` field marks the session making the request. `tokenHash`/`userId`
+> are never exposed.
 
 ### Session Verification
 
-All authenticated routes use the `verifySession` middleware, which:
-1. Extracts the Bearer token from the `Authorization` header
-2. SHA-256 hashes the token and looks it up in the `sessions` table
-3. Rejects expired sessions (deletes them)
-4. Refreshes `lastActive`, `ipAddress`, and `userAgent` if the IP/UA changed or it's been >15 minutes
-5. Attaches `req.user` and `req.session` to the request object
+Authenticated routes use `verifySession`, which:
+
+1. Requires `Authorization: Bearer <token>` (`401 "Unauthorized"` when missing/unknown/expired; `401 "Invalid authorization header"` when the scheme is not `Bearer` or the token part is missing)
+2. SHA-256 hashes the token and looks it up in `sessions.token_hash`; deletes and rejects expired sessions
+3. Updates `ipAddress`, `userAgent`, `lastActive` when the IP/UA changed or `lastActive` is older than 15 minutes
+4. Attaches `req.user` (`id, username, name, email, avatarUrl, createdAt, updatedAt`) and `req.session` (full session row)
+
+`GET /api/v1/read/project/:publicId` instead uses `isAuthenticated`: identical
+checks, but never rejects — it sets `req.isAuthenticated` (`true`/`false`) and
+only populates `req.user`/`req.session` on success (used for `bookmarked`
+flags).
 
 ---
 
 ## Health Check
 
-The `ADMIN_KEY` is optional. The endpoint always returns basic health status;
-when `ADMIN_KEY` is configured and the matching bearer value is supplied, the
-response also includes per-service status in `services`.
+`ADMIN_KEY` is optional. The endpoint always responds; when `ADMIN_KEY` is
+configured and the matching value is supplied, the response also includes
+per-service status in `services`. The route is at the server root, not under
+`/api/v1`.
 
 ```
 GET /status
 ```
 
-**Headers:** `Authorization: Bearer <admin_token>` (optional; detailed service info only shown to admins)
+**Headers:** `Authorization: Bearer <ADMIN_KEY>` (optional; `services` only shown to admins)
 
-**Response (Admin):**
+**Response — healthy (200):**
 
 ```json
 {
@@ -284,28 +323,47 @@ GET /status
 }
 ```
 
-**Response (Non-Admin):**
+**Response — degraded (503):**
 
 ```json
 {
-  "success": true,
-  "message": "All systems operational",
-  "healthy": true,
-  "code": 200
+  "success": false,
+  "message": "Some/all systems are not operational or unavailable",
+  "healthy": false,
+  "code": 503,
+  "services": {
+    "postgres": "up",
+    "redis": "down"
+  }
 }
 ```
 
-> `ADMIN_KEY` is optional. Basic health status is available without it; when configured, the matching bearer token also includes the `services` object.
+> `services` is present only when `req.isAdmin` is true. `success` mirrors
+> `healthy`. Postgres is checked with `SELECT 1`; Redis with `PING` (expects
+> `PONG`). The admin comparison uses `crypto.timingSafeEqual` against
+> `ADMIN_KEY` (second whitespace-separated header part); missing/short keys
+> are treated as non-admin. When `ADMIN_KEY` is unset, everyone is non-admin.
 
 ---
 
 ## Projects
 
-Project management routes require authentication. The public project route
-(`GET /api/v1/read/project/:publicId`) is the exception and does not require a
-session; it can read either listed or unlisted projects when the public ID is
-known.
+Auth matrix:
 
+| Endpoint | Auth |
+|---|---|
+| `POST /api/v1/create/project` | required (owner created) |
+| `GET /api/v1/read/projects` | required (owner-scoped dashboard) |
+| `GET /api/v1/read/project/:publicId/details` | required (owner-only) |
+| `GET /api/v1/read/project/:publicId/analytics` | required (owner-only) |
+| `GET /api/v1/read/project/:publicId/parts` | required (owner-only) |
+| `PATCH /api/v1/update/project/:publicId` | required (owner-only) |
+| `DELETE /api/v1/delete/project/:publicId` | required (owner-only) |
+| `GET /api/v1/read/search/projects` | public (listed only) |
+| `GET /api/v1/read/projects/discover` | public (listed only) |
+| `GET /api/v1/read/user`, `/user/projects` | public (listed only) |
+| `GET /api/v1/read/project/:publicId/meta` | public (listed or unlisted) |
+| `GET /api/v1/read/project/:publicId` | public, optional auth (listed or unlisted; auth adds `bookmarked` flags) |
 
 ### Create a Project
 
@@ -323,16 +381,17 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | string | ✅ Yes | Project name (1–255 chars) |
-| `description` | string | No | Project description (max 1000 chars) |
-| `file_url` | string | ✅ Yes | ImageKit-hosted `.glb` URL |
-| `unlisted` | boolean | No | Visibility flag (defaults to `true` in the database) |
+| `name` | string | ✅ Yes | Project name, trimmed, 1–255 chars (`"name must not be empty"` when blank) |
+| `description` | string\|null | No | Optional, trimmed, max 1000 chars |
+| `file_url` | string | ✅ Yes | ImageKit-hosted `.glb` URL, max 2048 chars |
+| `unlisted` | boolean | ✅ Yes | **Required** boolean visibility flag (DB default is also `true`, but the validator rejects a missing value) |
 
-**Validation:**
-- `file_url` must start with `IMAGEKIT_URL_ENDPOINT` and end with `.glb`
-- `file_url` must be reachable (HEAD request)
+**Validation (`file_url`):**
+- `IMAGEKIT_URL_ENDPOINT` must be configured or validation fails (`"file_url could not be validated"`)
+- Must start with `IMAGEKIT_URL_ENDPOINT` (case-sensitive) and end with `.glb` (case-insensitive)
+- `HEAD` request (5 s timeout) must succeed with `content-type: model/gltf-binary` or `application/octet-stream`, else `"file_url must point to a valid GLB file"` / `"file_url must point to a reachable GLB file"`
 
-**Response:**
+**Response (200; note: not 201):**
 
 ```json
 {
@@ -345,7 +404,7 @@ Content-Type: application/json
     "name": "string",
     "description": "string|null",
     "glbFileUrl": "string",
-    "unlisted": boolean,
+    "unlisted": true,
     "createdAt": "ISO8601",
     "updatedAt": "ISO8601"
   },
@@ -361,7 +420,10 @@ GET /api/v1/read/projects
 
 **Headers:** `Authorization: Bearer <session_token>`
 
-**Response:**
+Returns only projects owned by the authenticated user, ordered by `updatedAt`
+descending, each with `parts` (row count) and `views` (unique-IP row count).
+
+**Response (200):**
 
 ```json
 {
@@ -374,7 +436,7 @@ GET /api/v1/read/projects
       "name": "string",
       "description": "string|null",
       "glbFileUrl": "string",
-      "unlisted": boolean,
+      "unlisted": true,
       "createdAt": "ISO8601",
       "updatedAt": "ISO8601",
       "parts": 0,
@@ -390,34 +452,33 @@ GET /api/v1/read/projects
 }
 ```
 
-> Returns only projects owned by the authenticated user, ordered by `updatedAt` descending. Includes part counts and view counts per project.
-
 ### Search Public Projects (Infinite Scroll)
 
 ```
 GET /api/v1/read/search/projects?q=<query>&limit=10&cursor=0
 ```
 
-**Public endpoint.** No authentication required. Only projects with `unlisted = false` are searched.
+**Public endpoint.** Only `unlisted = false` projects are searched.
 
 **Query Parameters:**
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `q` | string | ✅ Yes | Search text, 1–200 chars. Matched case-insensitively against project `name` and `description` via substring (`ILIKE %q%`) |
-| `limit` | integer | No | Page size, 1–50 (default `10`) |
-| `cursor` | integer | No | Zero-based offset for infinite scroll (default `0`). Pass back `nextCursor` from the previous response |
+| `q` | string | ✅ Yes | 1–200 chars, trimmed. Case-insensitive substring match (`ILIKE %q%`) against `name` and `description` |
+| `limit` | integer | No | 1–50 (default `10`) |
+| `cursor` | integer | No | Zero-based offset (default `0`). Pass back string `nextCursor` |
 
 **Relevance ordering:**
 
 1. `name` equals `q` (case-insensitive)
 2. `name` starts with `q`
 3. `name` contains `q`
-4. `description` contains `q` (name did not match)
+4. only `description` contains `q`
 
-Ties are broken by view count (`DESC`), then `createdAt` (`DESC`), then `id` (`DESC`).
+Ties: view count (`COUNT(project_views.id)`) `DESC`, then `createdAt` `DESC`,
+then `id` `DESC`.
 
-**Response:**
+**Response (200):**
 
 ```json
 {
@@ -449,7 +510,8 @@ Ties are broken by view count (`DESC`), then `createdAt` (`DESC`), then `id` (`D
 }
 ```
 
-> `nextCursor` is the `cursor` value to pass on the next request, or `null` when there are no more pages. `LIKE` wildcards (`%`, `_`, `\`) in `q` are escaped so they are treated literally.
+> `nextCursor` is the offset string for the next request, or `null` when done.
+> `\`, `%`, `_` in `q` are escaped so they match literally.
 
 ### Discover Public Projects (Infinite Scroll)
 
@@ -457,39 +519,33 @@ Ties are broken by view count (`DESC`), then `createdAt` (`DESC`), then `id` (`D
 GET /api/v1/read/projects/discover?sort=newest&limit=10&cursor=0
 ```
 
-**Public endpoint.** No authentication required. Only projects with `unlisted = false` are returned.
-
-**Query Parameters:**
+**Public endpoint.** Only `unlisted = false` projects.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `sort` | string | No | `'newest'` (default) or `'top'` |
-| `limit` | integer | No | Page size, 1–50 (default `10`) |
-| `cursor` | integer | No | Zero-based offset for infinite scroll (default `0`). Pass back `nextCursor` from the previous response |
+| `limit` | integer | No | 1–50 (default `10`) |
+| `cursor` | integer | No | Zero-based offset (default `0`) |
 
-**Sort behavior:**
+- `sort=newest` → `createdAt DESC, id DESC`
+- `sort=top` → `COUNT(project_views.id) DESC, createdAt DESC, id DESC` (one row per unique viewer IP)
 
-* `sort=newest` → ordered by `createdAt` `DESC`, then `id` `DESC`
-* `sort=top` → ordered by view count (`COUNT(project_views)`) `DESC`, then `createdAt` `DESC`, then `id` `DESC`
-
-View count is the number of rows in `project_views` for the project (one row per unique viewer IP).
-
-**Response:**
+**Response (200):** same `items` shape as search.
 
 ```json
 {
   "success": true,
   "message": "Newest projects retrieved",
   "data": {
-    "items": [ { ...same project shape as search... } ],
-    "nextCursor": "10",
-    "hasMore": true
+    "items": [],
+    "nextCursor": null,
+    "hasMore": false
   },
   "code": 200
 }
 ```
 
-> `message` is `"Top projects retrieved"` when `sort=top`. `nextCursor`/`hasMore` work the same as the search endpoint.
+> `message` is `"Top projects retrieved"` when `sort=top`.
 
 ### Get Project Details (Owner)
 
@@ -499,13 +555,9 @@ GET /api/v1/read/project/:publicId/details
 
 **Headers:** `Authorization: Bearer <session_token>`
 
-**Path Parameters:**
+Owner-only (`publicId` + `userId` must match).
 
-| Parameter | Type | Description |
-|---|---|---|
-| `publicId` | string | NanoID public identifier (21 chars) |
-
-**Response:**
+**Response (200):**
 
 ```json
 {
@@ -518,7 +570,7 @@ GET /api/v1/read/project/:publicId/details
     "name": "string",
     "description": "string|null",
     "glbFileUrl": "string",
-    "unlisted": boolean,
+    "unlisted": true,
     "createdAt": "ISO8601",
     "updatedAt": "ISO8601"
   },
@@ -526,7 +578,41 @@ GET /api/v1/read/project/:publicId/details
 }
 ```
 
-### Get Parts for a Project
+Errors: `400 "Invalid project identifier"` (non-string param) · `404 "Project not found"` (missing or not owned).
+
+### Get Project Analytics (Owner)
+
+```
+GET /api/v1/read/project/:publicId/analytics
+```
+
+**Headers:** `Authorization: Bearer <session_token>`
+
+Owner-only. Day boundaries are UTC (today = UTC midnight, week starts Sunday
+UTC, month starts the 1st UTC); `recentlyViewed` holds up to 10 `viewedAt`
+timestamps, newest first.
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Project analytics retrieved",
+  "data": {
+    "project": { "id": "uuid", "publicId": "string", "name": "string" },
+    "uniqueViewers": 0,
+    "viewersToday": 0,
+    "viewersThisWeek": 0,
+    "viewersThisMonth": 0,
+    "recentlyViewed": ["ISO8601"]
+  },
+  "code": 200
+}
+```
+
+Errors: `400 "Invalid project identifier"` · `404 "Project not found"`.
+
+### Get Parts for a Project (Owner)
 
 ```
 GET /api/v1/read/project/:publicId/parts
@@ -534,20 +620,27 @@ GET /api/v1/read/project/:publicId/parts
 
 **Headers:** `Authorization: Bearer <session_token>`
 
-**Path Parameters:**
+Owner-only. Returns the project (limited fields) plus its parts; each part
+carries its manuals (possibly empty). Rows ordered by `manual.uploadedAt`
+`DESC`.
 
-| Parameter | Type | Description |
-|---|---|---|
-| `publicId` | string | NanoID public identifier |
-
-**Response:**
+**Response (200):**
 
 ```json
 {
   "success": true,
   "message": "Project manuals retrieved",
   "data": {
-    "project": { ... },
+    "project": {
+      "id": "uuid",
+      "publicId": "string",
+      "name": "string",
+      "description": "string|null",
+      "glbFileUrl": "string",
+      "unlisted": true,
+      "createdAt": "ISO8601",
+      "updatedAt": "ISO8601"
+    },
     "parts": [
       {
         "id": "uuid",
@@ -571,7 +664,45 @@ GET /api/v1/read/project/:publicId/parts
 }
 ```
 
-> Returns parts grouped by part, with their associated manuals. Ordered by manual upload date descending.
+Errors: `400 "Invalid project identifier"` · `404 "Project not found"`.
+
+### Get Project Meta (Public)
+
+```
+GET /api/v1/read/project/:publicId/meta
+```
+
+Public, no auth. Works for listed and unlisted projects when the ID is known.
+No view is recorded. Note: unlike the full view below, this omits `glbFileUrl`,
+parts, and bookmark flags.
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Project meta retrieved",
+  "data": {
+    "id": "uuid",
+    "publicId": "string",
+    "name": "string",
+    "description": "string|null",
+    "unlisted": true,
+    "createdAt": "ISO8601",
+    "updatedAt": "ISO8601",
+    "owner": {
+      "id": "uuid",
+      "username": "string",
+      "name": "string",
+      "avatarUrl": "string|null"
+    },
+    "views": 0
+  },
+  "code": 200
+}
+```
+
+Errors: `400 "Invalid project identifier"` · `404 "Project not found"`.
 
 ### Get Public Project (View Tracking)
 
@@ -579,15 +710,11 @@ GET /api/v1/read/project/:publicId/parts
 GET /api/v1/read/project/:publicId
 ```
 
-**Headers:** None required (public endpoint)
+Public; auth is optional (`isAuthenticated`). Works for listed and unlisted
+projects when the ID is known. When authenticated, the response includes
+`bookmarked` (project) and per-part `bookmarked` flags.
 
-**Path Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `publicId` | string | NanoID public identifier |
-
-**Response:**
+**Response (200):**
 
 ```json
 {
@@ -596,12 +723,14 @@ GET /api/v1/read/project/:publicId
   "data": {
     "id": "uuid",
     "publicId": "string",
+    "userId": "uuid",
     "name": "string",
     "description": "string|null",
     "glbFileUrl": "string",
-    "unlisted": boolean,
+    "unlisted": true,
     "createdAt": "ISO8601",
     "updatedAt": "ISO8601",
+    "bookmarked": false,
     "owner": {
       "id": "uuid",
       "username": "string",
@@ -613,12 +742,22 @@ GET /api/v1/read/project/:publicId
     "parts": [
       {
         "id": "uuid",
+        "projectId": "uuid",
         "partNumber": "string",
         "name": "string",
         "description": "string|null",
         "createdAt": "ISO8601",
         "updatedAt": "ISO8601",
-        "manuals": [...]
+        "bookmarked": false,
+        "manuals": [
+          {
+            "id": "uuid",
+            "partId": "uuid",
+            "title": "string",
+            "fileUrl": "string",
+            "uploadedAt": "ISO8601"
+          }
+        ]
       }
     ]
   },
@@ -626,7 +765,12 @@ GET /api/v1/read/project/:publicId
 }
 ```
 
-> **Side effect:** An upsert is performed on the `project_views` table for the requesting IP address. This tracks unique views per project per IP.
+> **Side effect (after the response is sent):** upsert into `project_views`
+> keyed by `(project_id, ip)` setting `viewed_at = now()` — one row per unique
+> viewer IP; repeat views only refresh the timestamp. `req.ip` (or
+> `"unknown"`) is used.
+
+Errors: `400 "Invalid project identifier"` · `404 "Project not found"`.
 
 ### Update a Project
 
@@ -640,33 +784,35 @@ Authorization: Bearer <session_token>
 Content-Type: application/json
 ```
 
-**Path Parameters:**
+Owner-only. Body must contain at least one allowed field and no others
+(`name`, `description`, `file_url`, `unlisted`); `file_url` maps to
+`glbFileUrl`. Same `file_url` ImageKit + `HEAD` rules as creation.
+`updatedAt` is refreshed.
 
-| Parameter | Type | Description |
-|---|---|---|
-| `publicId` | string | NanoID public identifier |
-
-**Request Body** (all fields optional, at least one required):
+**Request Body** (at least one required):
 
 | Field | Type | Description |
 |---|---|---|
-| `name` | string | Project name (1–255 chars) |
-| `description` | string | Description (max 1000 chars) |
+| `name` | string | 1–255 chars |
+| `description` | string\|null | Max 1000 chars |
 | `file_url` | string | New ImageKit `.glb` URL |
 | `unlisted` | boolean | Visibility toggle |
 
-**Validation:** `file_url` must start with `IMAGEKIT_URL_ENDPOINT` and end with `.glb`, and be reachable.
-
-**Response:**
+**Response (200):**
 
 ```json
 {
   "success": true,
   "message": "Project updated",
-  "data": { ...project },
+  "data": { "id": "uuid", "publicId": "string" },
   "code": 200
 }
 ```
+
+(`data` is the full updated project row.) Errors: validation `400
+"invalid request body"` (+ `at least one project field is required` /
+`request contains an unsupported project field`) · `400 "Invalid project
+identifier"` · `404 "Project not found"`.
 
 ### Delete a Project
 
@@ -676,13 +822,10 @@ DELETE /api/v1/delete/project/:publicId
 
 **Headers:** `Authorization: Bearer <session_token>`
 
-**Path Parameters:**
+Owner-only. No validator; the `publicId` type is checked manually (its `400`
+body has no `data` field, unlike most errors).
 
-| Parameter | Type | Description |
-|---|---|---|
-| `publicId` | string | NanoID public identifier |
-
-**Response:**
+**Response (200):**
 
 ```json
 {
@@ -693,13 +836,17 @@ DELETE /api/v1/delete/project/:publicId
 }
 ```
 
-> Deleting a project cascades to delete all associated parts and manuals (via `ON DELETE CASCADE`).
+> Deletion removes the project row; `ON DELETE CASCADE` removes its parts,
+> part manuals, views, and bookmarks. ImageKit files (GLB/PDFs) are **not**
+> deleted by the backend.
 
 ---
 
-## Parts
+## Parts & Manuals
 
-Parts belong to a project and can have multiple manuals (PDFs).
+Parts belong to one project; `(project_id, part_number)` is unique. A part can
+have many manuals (PDFs). Note the intentionally odd route name:
+`PATCH /api/v1/update/manual/:partId` updates a **part**, not a manual.
 
 ### Create a Part with Manuals
 
@@ -713,39 +860,37 @@ Authorization: Bearer <session_token>
 Content-Type: application/json
 ```
 
+Runs in a transaction. The project must be owned by the caller. `file_urls`
+may be an empty array (part is created with no manuals).
+
 **Request Body:**
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `public_id` | string | ✅ Yes | Project's public identifier (21 chars) |
-| `name` | string | ✅ Yes | Part name (1–255 chars) |
-| `part_number` | string | ✅ Yes | Part number (1–255 chars) |
-| `description` | string | No | Part description (max 1000 chars) |
-| `file_urls` | array | ✅ Yes | Array of `{ title, file_url }` objects |
+| `public_id` | string | ✅ Yes | Project public ID, 1–21 chars |
+| `name` | string | ✅ Yes | Part name, 1–255 chars |
+| `part_number` | string | ✅ Yes | Part number, 1–255 chars (unique per project) |
+| `description` | string\|null | No | Max 1000 chars |
+| `file_urls` | array | ✅ Yes | Array (possibly empty) of `{ title, file_url }` |
 
 Each `file_urls` item:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `title` | string | ✅ Yes | Manual title (1–255 chars) |
-| `file_url` | string | ✅ Yes | ImageKit PDF URL (must end with `.pdf`) |
+| `title` | string | ✅ Yes | 1–255 chars |
+| `file_url` | string | ✅ Yes | ImageKit PDF URL, max 2048 chars; must start with `IMAGEKIT_URL_ENDPOINT`, end `.pdf` (case-insensitive); `HEAD` (5 s) must return `content-type: application/pdf` |
 
-**Validation:**
-- Must belong to a project owned by the authenticated user
-- `file_url` must start with `IMAGEKIT_URL_ENDPOINT` and end with `.pdf`
-- Each URL must be reachable and return `content-type: application/pdf`
-- If a part with the same `part_number` already exists, the manuals are appended to it
-
-**Response:**
+**Response (201):**
 
 ```json
 {
   "success": true,
   "message": "Manual created successfully",
   "data": {
-    "project": { ... },
+    "project": { "id": "uuid", "publicId": "string" },
     "part": {
       "id": "uuid",
+      "projectId": "uuid",
       "partNumber": "string",
       "name": "string",
       "description": "string|null",
@@ -766,6 +911,9 @@ Each `file_urls` item:
 }
 ```
 
+Errors: `404 "Project not found"` (missing or not owned) · `409 "A part
+with this part number already exists in the project"`.
+
 ### Create a Manual for an Existing Part
 
 ```
@@ -778,19 +926,17 @@ Authorization: Bearer <session_token>
 Content-Type: application/json
 ```
 
+Adds one manual to a part in a caller-owned project.
+
 **Request Body:**
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `part_id` | string (UUID) | ✅ Yes | Part identifier |
-| `title` | string | ✅ Yes | Manual title (1–255 chars) |
-| `file_url` | string | ✅ Yes | ImageKit PDF URL |
+| `title` | string | ✅ Yes | 1–255 chars |
+| `file_url` | string | ✅ Yes | Same ImageKit PDF + `HEAD` rules as above |
 
-**Validation:**
-- Part must belong to a project owned by the authenticated user
-- `file_url` must start with `IMAGEKIT_URL_ENDPOINT`, end with `.pdf`, be reachable, and return `application/pdf`
-
-**Response:**
+**Response (201):**
 
 ```json
 {
@@ -807,6 +953,8 @@ Content-Type: application/json
 }
 ```
 
+Errors: `404 "Part not found"` (missing or not in an owned project).
+
 ### Update a Part
 
 ```
@@ -819,32 +967,35 @@ Authorization: Bearer <session_token>
 Content-Type: application/json
 ```
 
-**Path Parameters:**
+Despite `/manual/` in the path, this updates a **part** in a caller-owned
+project. At least one of `part_number`/`name`/`description`; no other fields.
 
 | Parameter | Type | Description |
 |---|---|---|
-| `partId` | UUID | Part identifier |
+| `partId` | UUID | Part identifier (path) |
 
-**Request Body** (at least one field required):
+**Request Body** (at least one required):
 
 | Field | Type | Description |
 |---|---|---|
-| `part_number` | string | Part number (1–255 chars) |
-| `name` | string | Part name (1–255 chars) |
-| `description` | string | Part description (max 1000 chars) |
+| `part_number` | string | 1–255 chars (still unique per project) |
+| `name` | string | 1–255 chars |
+| `description` | string\|null | Max 1000 chars |
 
-**Validation:** Only `part_number`, `name`, `description` fields are allowed.
-
-**Response:**
+**Response (200):**
 
 ```json
 {
   "success": true,
   "message": "Part updated",
-  "data": { ...part },
+  "data": { "id": "uuid", "projectId": "uuid" },
   "code": 200
 }
 ```
+
+(`data` is the full updated part row.) Errors: `400 "Invalid part
+identifier"` · `404 "Part not found"` · `409 "A part with this part number
+already exists in the project"`.
 
 ### Delete a Part
 
@@ -854,13 +1005,10 @@ DELETE /api/v1/delete/part/:partId
 
 **Headers:** `Authorization: Bearer <session_token>`
 
-**Path Parameters:**
+Owner-only (via the parent project). Cascades to its manuals
+(`ON DELETE CASCADE`).
 
-| Parameter | Type | Description |
-|---|---|---|
-| `partId` | UUID | Part identifier |
-
-**Response:**
+**Response (200):**
 
 ```json
 {
@@ -871,7 +1019,8 @@ DELETE /api/v1/delete/part/:partId
 }
 ```
 
-> Deleting a part cascades to delete all associated manuals.
+Errors: validation `400` (`partId must be a valid UUID`) · `400 "Invalid
+part identifier"` · `404 "Part not found"`.
 
 ### Delete a Manual
 
@@ -881,13 +1030,9 @@ DELETE /api/v1/delete/manual/:manualId
 
 **Headers:** `Authorization: Bearer <session_token>`
 
-**Path Parameters:**
+Owner-only (via part → project).
 
-| Parameter | Type | Description |
-|---|---|---|
-| `manualId` | UUID | Manual identifier |
-
-**Response:**
+**Response (200):**
 
 ```json
 {
@@ -898,6 +1043,205 @@ DELETE /api/v1/delete/manual/:manualId
 }
 ```
 
+Errors: validation `400` (`manualId must be a valid UUID`) · `400 "Invalid
+manual identifier"` · `404 "Manual not found"`.
+
+---
+
+## Bookmarks
+
+Bookmarking is idempotent: re-bookmarking returns `200` with a
+`... already bookmarked` message and `data: null` (`onConflictDoNothing`).
+
+### Bookmark a Project
+
+```
+POST /api/v1/create/bookmark/project
+```
+
+**Headers:** `Authorization: Bearer <session_token>` · Body: `{ "public_id": "string (1–21)" }`
+
+Any existing project (own or чужой) can be bookmarked.
+
+- `200 "Project bookmarked"`, `data` = bookmark row; or `200 "Project already bookmarked"`, `data: null`
+- `404 "Project not found"`
+
+### Bookmark a Part
+
+```
+POST /api/v1/create/bookmark/part
+```
+
+Body: `{ "public_id": "string (1–21)", "part_id": "UUID" }`. The part must
+belong to the given project.
+
+- `200 "Part bookmarked"` / `"Part already bookmarked"` (`data` bookmark or `null`)
+- `404 "Project not found"` · `404 "Part not found"`
+
+### List Bookmarks
+
+```
+GET /api/v1/read/bookmarks?type=projects&limit=10&cursor=<bookmark_uuid>
+GET /api/v1/read/bookmarks?type=parts&limit=10&cursor=<bookmark_uuid>
+```
+
+**Headers:** `Authorization: Bearer <session_token>`
+
+| Query | Required | Description |
+|---|---|---|
+| `type` | ✅ Yes | `'projects'` or `'parts'` |
+| `cursor` | No | Bookmark UUID for keyset pagination (`id < cursor`, `id DESC`); `nextCursor` is a bookmark ID or `null` |
+| `limit` | No | 1–50 (default `10`) |
+
+A manual guard also returns `400 "Invalid bookmark type"` with
+`errors: ["type must be 'parts' or 'projects'"]` when `type` is anything else.
+
+**Response `type=projects` (200 `"Project bookmarks retrieved"`):**
+
+```json
+{
+  "success": true,
+  "message": "Project bookmarks retrieved",
+  "data": {
+    "items": [
+      {
+        "id": "uuid",
+        "createdAt": "ISO8601",
+        "project": {
+          "id": "uuid",
+          "publicId": "string",
+          "name": "string",
+          "description": "string|null",
+          "glbFileUrl": "string",
+          "unlisted": true,
+          "createdAt": "ISO8601",
+          "updatedAt": "ISO8601"
+        }
+      }
+    ],
+    "nextCursor": null,
+    "hasMore": false
+  },
+  "code": 200
+}
+```
+
+**Response `type=parts` (200 `"Part bookmarks retrieved"`):**
+
+```json
+{
+  "success": true,
+  "message": "Part bookmarks retrieved",
+  "data": {
+    "items": [
+      {
+        "id": "uuid",
+        "createdAt": "ISO8601",
+        "part": {
+          "id": "uuid",
+          "partNumber": "string",
+          "name": "string",
+          "description": "string|null",
+          "createdAt": "ISO8601",
+          "updatedAt": "ISO8601"
+        },
+        "project": { "id": "uuid", "publicId": "string", "name": "string" }
+      }
+    ],
+    "nextCursor": null,
+    "hasMore": false
+  },
+  "code": 200
+}
+```
+
+### Remove a Project Bookmark
+
+```
+DELETE /api/v1/delete/bookmark/project/:publicId
+```
+
+**Headers:** `Authorization: Bearer <session_token>`
+
+- `200 "Project bookmark removed"`, `data: { id }`
+- `400 "Invalid project identifier"` · `404 "Project not found"` · `404 "Project bookmark not found"`
+
+### Remove a Part Bookmark
+
+```
+DELETE /api/v1/delete/bookmark/part/:partId
+```
+
+**Headers:** `Authorization: Bearer <session_token>`
+
+- `200 "Part bookmark removed"`, `data: { id }`
+- `400 "Invalid part identifier"` · `404 "Part bookmark not found"`
+
+---
+
+## Users
+
+### Get User Profile (Public)
+
+```
+GET /api/v1/read/user?username=<username>
+```
+
+Public. `username`: required, 1–30 chars, `[A-Za-z0-9_-]+`.
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "User profile retrieved",
+  "data": {
+    "id": "uuid",
+    "username": "string",
+    "name": "string",
+    "avatarUrl": "string|null",
+    "createdAt": "ISO8601",
+    "totalProjects": 0
+  },
+  "code": 200
+}
+```
+
+> `totalProjects` counts only `unlisted = false` projects. Errors: `404 "User not found"`.
+
+### List a User's Public Projects
+
+```
+GET /api/v1/read/user/projects?username=<username>&limit=10&cursor=<project_uuid>
+```
+
+Public. Only `unlisted = false` projects, `id DESC`. Keyset pagination:
+`cursor` is a project UUID (`id < cursor`); `nextCursor` is a project UUID or
+`null`. `limit` 1–50, default `10`.
+
+**Response (200 `"User projects retrieved"`):** `data: { items: [{ id,
+publicId, name, description, glbFileUrl, unlisted, createdAt, updatedAt,
+parts, views }], nextCursor, hasMore }`. Errors: `404 "User not found"`.
+
+### Update Current User
+
+```
+PATCH /api/v1/update/user
+```
+
+**Headers:** `Authorization: Bearer <session_token>`
+
+At least one of `username` (1–30, `[A-Za-z0-9_-]+`), `name` (1–70),
+`avatar_url` (ImageKit image URL, max 512; must start with
+`IMAGEKIT_URL_ENDPOINT` and end `.jpg/.jpeg/.png/.webp/.gif`; `HEAD` (5 s)
+must return `image/jpeg|image/png|image/webp|image/gif`). `avatar_url` maps to
+`avatarUrl`. `updatedAt` refreshed.
+
+**Response (200 `"User updated"`):** `data: { id, username, name, email,
+avatarUrl, createdAt, updatedAt }`.
+
+Errors: `409 "Username already taken"` · `404 "User not found"`.
+
 ---
 
 ## File Upload
@@ -906,7 +1250,9 @@ DELETE /api/v1/delete/manual/:manualId
 POST /api/v1/upload/:kind
 ```
 
-Supported kinds: `glb`, `pdf`, `image`
+Supported kinds: `glb`, `pdf`, `image`. Auth required. Passes through both
+`generalRateLimit` and the stricter per-user `uploadRateLimit` (see
+[Rate Limiting](#rate-limiting)).
 
 **Headers:**
 ```
@@ -914,11 +1260,13 @@ Authorization: Bearer <session_token>
 Content-Type: multipart/form-data
 ```
 
-**Form Field:** `file` (single file)
+**Form Field:** `file` (single file; `files: 1`, memory storage)
 
 **Limits:**
 - Max file size: **25 MB**
-- Request timeout: **30 seconds**
+- Request timeout: **30 seconds** (`req.setTimeout`; destroys the request on fire)
+
+Extension **and** MIME type must both match (checked in `fileFilter`):
 
 ### GLB Upload
 
@@ -926,8 +1274,7 @@ Content-Type: multipart/form-data
 POST /api/v1/upload/glb
 ```
 
-Allowed extensions: `.glb`  
-Allowed MIME types: `model/gltf-binary`, `application/octet-stream`
+Extensions: `.glb` · MIME: `model/gltf-binary`, `application/octet-stream`
 
 ### PDF Upload
 
@@ -935,8 +1282,7 @@ Allowed MIME types: `model/gltf-binary`, `application/octet-stream`
 POST /api/v1/upload/pdf
 ```
 
-Allowed extensions: `.pdf`  
-Allowed MIME types: `application/pdf`
+Extensions: `.pdf` · MIME: `application/pdf`
 
 ### Image Upload
 
@@ -944,51 +1290,66 @@ Allowed MIME types: `application/pdf`
 POST /api/v1/upload/image
 ```
 
-Allowed extensions: `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`  
-Allowed MIME types: `image/jpeg`, `image/png`, `image/webp`, `image/gif`
+Extensions: `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif` · MIME: `image/jpeg`, `image/png`, `image/webp`, `image/gif`
 
-**Response:**
+**Response (200; message depends on kind):**
 
 ```json
 {
   "success": true,
   "message": "GLB file uploaded successfully",
   "data": {
-    "url": "https://ik.imagekit.io/arma/path/file.glb",
+    "url": "https://ik.imagekit.io/xxx/partlens/glb/<nanoid>.glb",
     "fileId": "string"
   },
   "code": 200
 }
 ```
 
+(`"PDF file uploaded successfully"` / `"IMAGE file uploaded successfully"`
+for the other kinds.)
+
 **Error Responses:**
 
 | Code | Message | Cause |
 |---|---|---|
-| 400 | "A valid file is required in the file field" | No file provided |
-| 400 | "Invalid file type..." | Wrong file extension or MIME type |
-| 413 | "File exceeds the 25 MB upload limit" | File too large |
-| 408 | "Upload timed out" | Upload took longer than 30 seconds |
-| 502 | "File upload failed" | ImageKit upload error |
-| 500 | "File upload is not configured" | Missing `IMAGEKIT_PRIVATE_KEY` |
+| 400 | `"A valid file is required in the file field"` | No file, or extension/MIME rejected by `fileFilter` |
+| 400 | `"Invalid file type. Upload the expected file type in the file field"` | Other `MulterError` (e.g. too many files) |
+| 413 | `"File exceeds the 25 MB upload limit"` | `LIMIT_FILE_SIZE` |
+| 408 | `"Upload timed out"` | 30 s request timeout fired |
+| 502 | `"File upload failed"` | ImageKit upload threw |
+| 500 | `"File upload is not configured"` | Missing `IMAGEKIT_PRIVATE_KEY` |
 
-> Files are uploaded to ImageKit in the `/partlens/{kind}/` folder with a unique `nanoid` filename.
+> Files are uploaded to ImageKit folder `/partlens/{kind}/` with filename
+> `<nanoid()><original-extension>`. Only `IMAGEKIT_PRIVATE_KEY` is used
+> server-side for uploads.
+
+---
+
+## Rate Limiting
+
+Full policy lives in `ratelimits.md`. Summary: `express-rate-limit` +
+`rate-limit-redis` over the existing Redis client, fixed windows, every
+request counted (including failures), lazy limiter init, `draft-8`
+`RateLimit` headers, Redis store errors go to the Express error handler
+(`500`), and `429` bodies are `{ success: false, message: "Too many
+requests. Please try again later.", data: null, code: 429 }`.
+
+| Scope | Limit | Key |
+|---|---|---|
+| `/api/v1/auth` | 20 / 15 min | client IP |
+| `/api/v1/create`, `/delete`, `/read`, `/update`, `/upload` | 300 / min | client IP |
+| `POST /api/v1/upload/{glb,pdf,image}` (additional) | 20 / hour | authenticated user ID (falls back to IP when unauthenticated) |
+
+Uploads therefore pass through **both** the general and the per-user upload
+limiter; missing/invalid sessions are rejected by `verifySession` before the
+per-user quota is consumed.
 
 ---
 
 ## Error Responses
 
-All error responses follow this format:
-
-```json
-{
-  "success": false,
-  "message": "Error description",
-  "code": <HTTP_STATUS_CODE>
-}
-```
-
-With optional `data` or `errors` fields:
+Validation failures (from `validate`):
 
 ```json
 {
@@ -1001,114 +1362,162 @@ With optional `data` or `errors` fields:
 }
 ```
 
-| Status Code | Description |
+Note the lowercase `message`. Most route-level `400`/`404` errors instead use
+`{ success: false, message, data: null, code }`; the `DELETE
+/api/v1/delete/project/:publicId` `400` omits `data`.
+
+| Status Code | Meaning / Example messages |
 |---|---|
-| 400 | Invalid request body (validation failure) |
-| 401 | Unauthorized (missing or invalid session token) |
-| 404 | Resource not found |
-| 408 | Upload timeout |
-| 413 | File too large |
-| 500 | Internal server error |
-| 502 | File upload failed (ImageKit error) |
-| 503 | Health check: some services down |
+| 400 | Validation failure (`"invalid request body"` + `errors`); `"invalid request"`, `"invalid state"`, `"invalid callback code"` (auth); `"Invalid project identifier"`, `"Invalid part identifier"`, `"Invalid manual identifier"`, `"Invalid bookmark type"`; upload file errors |
+| 401 | `"Unauthorized"` (missing/unknown/expired session); `"Invalid authorization header"` (non-`Bearer` or missing token) |
+| 404 | `"No matching route found."` (unknown path); `"Project not found"`, `"Part not found"`, `"Manual not found"`, `"User not found"`, `"Project bookmark not found"`, `"Part bookmark not found"` |
+| 408 | `"Upload timed out"` |
+| 409 | `"A part with this part number already exists in the project"`, `"Username already taken"` |
+| 413 | `"File exceeds the 25 MB upload limit"` |
+| 429 | `"Too many requests. Please try again later."` (see `ratelimits.md`) |
+| 500 | `"Internal server error"` (error handler); `"File upload is not configured"` |
+| 502 | `"File upload failed"` (ImageKit) |
+| 503 | Health check degraded (`success: false`, `healthy: false`) |
+
+Missing manuals for a clicked part is not an error — endpoints return empty
+`manuals: []`.
 
 ---
 
 ## Database Schema
 
+IDs default to `uuidv7()`. Timestamps are `timestamptz` (`defaultNow()`).
+FKs use `ON DELETE CASCADE`.
+
 ### `users`
 
 | Column | Type | Description |
 |---|---|---|
-| `id` | uuid (PK) | Primary key, generated via `uuidv7()` |
-| `google_id` | varchar(255) | Google OAuth ID, unique, not null |
-| `avatar_url` | varchar(512) | Google profile picture URL |
-| `email_verified` | boolean | Email verification status |
-| `username` | varchar(30) | Auto-generated NanoID if not provided by Google |
-| `name` | varchar(70) | Full name |
-| `email` | varchar(254) | Email, unique |
-| `created_at` | timestamp | Record creation time |
-| `updated_at` | timestamp | Last update time |
+| `id` | uuid (PK) | `uuidv7()` |
+| `google_id` | varchar(255), unique, not null | Google `sub` |
+| `avatar_url` | varchar(512), nullable | Google picture |
+| `email_verified` | boolean, not null, default `false` | From Google profile |
+| `username` | varchar(30), unique, not null | `nanoid()` (21 chars) on OAuth signup; user-editable (`[A-Za-z0-9_-]+`) |
+| `name` | varchar(70), not null | Not unique |
+| `email` | varchar(254), unique, not null | From Google profile |
+| `created_at` / `updated_at` | timestamptz | |
 
 ### `sessions`
 
 | Column | Type | Description |
 |---|---|---|
-| `id` | uuid (PK) | Primary key |
-| `user_id` | uuid (FK → users) | References user, cascade delete |
-| `token_hash` | varchar(64) | SHA-256 hash of session token, unique |
-| `expires_at` | timestamp | Session expiry (30 days) |
-| `created_at` | timestamp | Record creation time |
-| `ip_address` | varchar(45) | Client IP address (max IPv6) |
-| `user_agent` | varchar(512) | Client user agent string |
-| `last_active` | timestamp | Last activity timestamp |
+| `id` | uuid (PK) | `uuidv7()` |
+| `user_id` | uuid FK → users, cascade | |
+| `token_hash` | varchar(64), unique, not null | SHA-256 hex of the bearer token |
+| `expires_at` | timestamptz, not null | Creation + 30 days |
+| `created_at` | timestamptz | |
+| `ip_address` | varchar(45), nullable | Max IPv6 length; refreshed on change |
+| `user_agent` | varchar(512), nullable | Refreshed on change |
+| `last_active` | timestamptz | Refreshed when stale (>15 min) or IP/UA changed |
+
+Index on `user_id`.
 
 ### `projects`
 
 | Column | Type | Description |
 |---|---|---|
-| `id` | uuid (PK) | Primary key |
-| `public_id` | varchar(21) | Public NanoID identifier, unique |
-| `user_id` | uuid (FK → users) | Owner reference, cascade delete |
-| `name` | varchar(255) | Project name |
-| `description` | varchar(1000) | Project description |
-| `glb_file_url` | varchar(2048) | ImageKit-hosted GLB file URL |
-| `unlisted` | boolean | Visibility (default: `true`) |
-| `created_at` | timestamp | Record creation time |
-| `updated_at` | timestamp | Last update time |
+| `id` | uuid (PK) | `uuidv7()` |
+| `public_id` | varchar(21), unique, not null | `nanoid()` (21 chars); public URL identifier |
+| `user_id` | uuid FK → users, cascade | Owner |
+| `name` | varchar(255), not null | |
+| `description` | varchar(1000), nullable | |
+| `glb_file_url` | varchar(2048), not null | ImageKit `.glb` URL |
+| `unlisted` | boolean, not null, default `true` | `false` = public/discoverable |
+| `created_at` / `updated_at` | timestamptz | |
+
+Indexes on `user_id`, `unlisted`.
 
 ### `project_views`
 
 | Column | Type | Description |
 |---|---|---|
-| `id` | uuid (PK) | Primary key |
-| `project_id` | uuid (FK → projects) | References project, cascade delete |
-| `ip` | varchar(45) | Viewer IP address |
-| `viewed_at` | timestamp | View timestamp |
+| `id` | uuid (PK) | |
+| `project_id` | uuid FK → projects, cascade | |
+| `ip` | varchar(45), not null | Viewer IP (`req.ip` or `"unknown"`) |
+| `viewed_at` | timestamptz | Refreshed on repeat view |
 
-> Unique constraint on `(project_id, ip)` — one view per IP per project.
+> Unique index on `(project_id, ip)` — one row per IP per project. `GET
+> /api/v1/read/project/:publicId` upserts this row after responding.
+
+Index on `project_id`.
 
 ### `parts`
 
 | Column | Type | Description |
 |---|---|---|
-| `id` | uuid (PK) | Primary key |
-| `project_id` | uuid (FK → projects) | References project, cascade delete |
-| `part_number` | varchar(255) | Part identifier number |
-| `name` | varchar(255) | Part name |
-| `description` | varchar(1000) | Part description |
-| `created_at` | timestamp | Record creation time |
-| `updated_at` | timestamp | Last update time |
+| `id` | uuid (PK) | |
+| `project_id` | uuid FK → projects, cascade | |
+| `part_number` | varchar(255), not null | Unique per project (see below) |
+| `name` | varchar(255), not null | |
+| `description` | varchar(1000), nullable | |
+| `created_at` / `updated_at` | timestamptz | |
+
+> Unique index on `(project_id, part_number)` — duplicate numbers yield `409`.
+
+Index on `project_id`.
 
 ### `part_manuals`
 
 | Column | Type | Description |
 |---|---|---|
-| `id` | uuid (PK) | Primary key |
-| `part_id` | uuid (FK → parts) | References part, cascade delete |
-| `title` | varchar(255) | Manual title |
-| `file_url` | varchar(2048) | ImageKit-hosted PDF URL |
-| `uploaded_at` | timestamp | Upload timestamp |
+| `id` | uuid (PK) | |
+| `part_id` | uuid FK → parts, cascade | |
+| `title` | varchar(255), not null | |
+| `file_url` | varchar(2048), not null | ImageKit `.pdf` URL |
+| `uploaded_at` | timestamptz | No `created_at`/`updated_at` on this table |
+
+Index on `part_id`.
+
+### `project_bookmarks`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | uuid (PK) | |
+| `user_id` | uuid FK → users, cascade | |
+| `project_id` | uuid FK → projects, cascade | |
+| `created_at` | timestamptz | |
+
+> Unique index on `(user_id, project_id)` — re-bookmark is a no-op returning `"Project already bookmarked"`.
+
+Index on `user_id`.
+
+### `part_bookmarks`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | uuid (PK) | |
+| `user_id` | uuid FK → users, cascade | |
+| `part_id` | uuid FK → parts, cascade | |
+| `created_at` | timestamptz | |
+
+> Unique index on `(user_id, part_id)` — re-bookmark returns `"Part already bookmarked"`.
+
+Index on `user_id`.
 
 ---
 
 ## Environment Variables
 
-| Variable | Description | Example |
+| Variable | Required | Description |
 |---|---|---|
-| `POSTGRES_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/db` |
-| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
-| `REDIS_PREFIX` | Key prefix for Redis namespaces | `partlens` |
-| `ADMIN_KEY` | Secret key for admin health check | `randomauthsecret` |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID | `...apps.googleusercontent.com` |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | `GOCSPX-...` |
-| `FRONTEND_URL` | Frontend origin URL | `http://localhost:3000` |
-| `BACKEND_URL` | Backend origin URL | `http://localhost:5050` |
-| `IMAGEKIT_PUBLIC_KEY` | ImageKit public key | `public_...` |
-| `IMAGEKIT_PRIVATE_KEY` | ImageKit private key | `private_...` |
-| `IMAGEKIT_URL_ENDPOINT` | ImageKit base URL for validation | `https://ik.imagekit.io/arma/` |
-| `NODE_ENV` | Environment mode | `development` / `production` |
-| `PORT` | Server port | `5050` |
+| `POSTGRES_URL` | ✅ | PostgreSQL connection string for `pg` Pool |
+| `REDIS_URL` | ✅ | Redis connection URL |
+| `REDIS_PREFIX` | ✅ (in practice) | Key prefix. Auth keys use it verbatim (`${REDIS_PREFIX}:auth:...`); rate limiters fall back to `partlens` when unset — keep it set and consistent across instances |
+| `ADMIN_KEY` | No | Optional; when unset `/status` never includes `services` |
+| `GOOGLE_CLIENT_ID` | ✅ | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | ✅ | Google OAuth client secret |
+| `FRONTEND_URL` | ✅ | OAuth callback redirect origin (`<FRONTEND_URL>/auth/callback?code=...`) |
+| `BACKEND_URL` | ✅ | OAuth `redirect_uri` origin (`<BACKEND_URL>/api/v1/auth/google/callback`) |
+| `IMAGEKIT_PUBLIC_KEY` | ✅ | ImageKit public key (client/frontend use) |
+| `IMAGEKIT_PRIVATE_KEY` | ✅ | Required for `/upload/*`; missing key yields `500 "File upload is not configured"` |
+| `IMAGEKIT_URL_ENDPOINT` | ✅ | Base URL that `file_url`/`avatar_url` must start with; validators fail with `... could not be validated` when unset |
+| `NODE_ENV` | No | `trust proxy` enabled only in `production`; default `development` |
+| `PORT` | No | Default `5050` |
 
 ---
 
@@ -1116,19 +1525,42 @@ With optional `data` or `errors` fields:
 
 ### `verifySession`
 
-Applied to all authenticated routes. Validates the Bearer token, resolves the user and session, and refreshes session metadata (IP, user-agent, lastActive).
+Required auth for all non-public routes. Exact `401` bodies:
+`{ success: false, message: "Unauthorized", code: 401 }` (missing / unknown /
+expired token) and `{ success: false, message: "Invalid authorization
+header", code: 401 }` (non-`Bearer` scheme or missing token). Refreshes
+`ipAddress`/`userAgent`/`lastActive` as described in
+[Session Verification](#session-verification).
+
+### `isAuthenticated`
+
+Optional-auth variant used only by `GET /api/v1/read/project/:publicId`.
+Never sends an error; sets `req.isAuthenticated` and populates `req.user` /
+`req.session` only on a valid session.
 
 ### `isAdminRequest`
 
-Applied to the `/status` health check endpoint. Compares the provided admin key against `ADMIN_KEY` using `crypto.timingSafeEqual`.
+Used only by `GET /status`. Compares the second header part against
+`ADMIN_KEY` with `crypto.timingSafeEqual` (length mismatch → non-admin).
+Missing/unset `ADMIN_KEY` → `req.isAdmin = false`, request still succeeds.
+
+### `authRateLimit` / `generalRateLimit` / `uploadRateLimit`
+
+See [Rate Limiting](#rate-limiting) and `ratelimits.md`. Redis-backed,
+`429 { success: false, message: "Too many requests. Please try again later.",
+data: null, code: 429 }`, `draft-8` headers.
 
 ### `validate`
 
-Wraps `express-validator` chains. Returns a 400 with validation errors if any rule fails.
+Runs an `express-validator` chain array; on failure returns `400
+{ success: false, message: "invalid request body", errors: errors.array(),
+code: 400 }` (lowercase message).
 
 ### `errorHandler`
 
-Catches unhandled errors and returns a generic 500 response.
+Final handler: logs and returns `500 { success: false, message: "Internal
+server error", code: 500 }`. Redis store errors from rate limiters also land
+here (`passOnStoreError: false`).
 
 ---
 
@@ -1136,31 +1568,69 @@ Catches unhandled errors and returns a generic 500 response.
 
 ### `createProjectValidator`
 
-Validates `POST /api/v1/create/project` request body: `name` (required, 1–255 chars), `description` (optional, max 1000), `file_url` (required, must be an ImageKit `.glb` URL, must be reachable), and `unlisted` (optional boolean; the database default is `true`).
+`POST /api/v1/create/project`: `name` (string, trimmed, 1–255;
+`"name must not be empty"` when blank), `description` (optional/null, string,
+trimmed, ≤1000), `file_url` (required, string, ≤2048, ImageKit `.glb` +
+reachable `HEAD` as above), `unlisted` (**required** boolean —
+`"unlisted must be a boolean"`).
 
 ### `updateProjectValidator`
 
-Validates `PATCH /api/v1/update/project/:publicId` request body: at least one of `name`, `description`, `file_url`, `unlisted` required. `file_url` must be ImageKit `.glb` URL and reachable.
+`PATCH /api/v1/update/project/:publicId`: body must be non-empty
+(`"at least one project field is required"`) with only `name`, `description`,
+`file_url`, `unlisted` (`"request contains an unsupported project field"`).
+Field rules mirror creation except all optional (`name` 1–255;
+`description` ≤1000; `file_url` same GLB checks; `unlisted` boolean).
+
+### `searchProjectsValidator`
+
+`GET /api/v1/read/search/projects` query: `q` (required string, trimmed,
+1–200), `limit` (optional int 1–50), `cursor` (optional non-negative int
+offset).
+
+### `discoverProjectsValidator`
+
+`GET /api/v1/read/projects/discover` query: `sort` (optional,
+`'top'|'newest'`), `limit` (optional int 1–50), `cursor` (optional
+non-negative int offset).
 
 ### `createManualValidator`
 
-Validates `POST /api/v1/create/part` request body: `public_id` (required, 1–21 chars), `name`, `part_number` (1–255 chars each), `description` (optional, max 1000), `file_urls` (array of `{title, file_url}` objects, each `.pdf` ImageKit URL reachable).
+`POST /api/v1/create/part`: `public_id` (required, 1–21 chars), `name` /
+`part_number` (string, trimmed, 1–255), `description` (optional/null, ≤1000),
+`file_urls` (required array; every element must be an object with `title` +
+`file_url`), `file_urls.*.title` (1–255), `file_urls.*.file_url` (string,
+≤2048, ImageKit `.pdf` + reachable `HEAD` with `application/pdf`).
 
 ### `createPartManualValidator`
 
-Validates `POST /api/v1/create/manual` request body: `part_id` (valid UUID), `title` (1–255 chars), `file_url` (`.pdf` ImageKit URL reachable).
+`POST /api/v1/create/manual`: `part_id` (required UUID), `title` (1–255),
+`file_url` (same PDF rules).
 
 ### `updatePartValidator`
 
-Validates `PATCH /api/v1/update/manual/:partId` request body: `partId` must be valid UUID, body must contain at least one of `part_number`, `name`, `description`.
+`PATCH /api/v1/update/manual/:partId`: `partId` param must be UUID; body must
+be non-empty with only `part_number`/`name`/`description`
+(`"at least one part field is required"` /
+`"request contains an unsupported part field"`).
 
-### `deletePartValidator`
+### `deletePartValidator` / `deleteManualValidator`
 
-Validates `DELETE /api/v1/delete/part/:partId`: `partId` must be valid UUID.
+`partId` / `manualId` params must be UUIDs.
 
-### `deleteManualValidator`
+### Bookmark validators
 
-Validates `DELETE /api/v1/delete/manual/:manualId`: `manualId` must be valid UUID.
+- `createProjectBookmarkValidator`: `public_id` (required, 1–21)
+- `createPartBookmarkValidator`: `public_id` (required, 1–21) + `part_id` (required UUID)
+- `deleteProjectBookmarkValidator`: `publicId` param (string, 1–21)
+- `deletePartBookmarkValidator`: `partId` param (UUID)
+- `listBookmarksValidator`: `type` (required, `'parts'|'projects'`), `cursor` (optional string UUID), `limit` (optional int 1–50)
+
+### User validators
+
+- `updateUserValidator`: body non-empty with only `username`/`name`/`avatar_url`; `username` (optional, 1–30, `/^[a-zA-Z0-9_-]+$/`), `name` (optional, 1–70), `avatar_url` (optional/null, ≤512, ImageKit image extension + reachable `HEAD` with `image/*`)
+- `getUserProfileValidator`: `username` query (required, 1–30, same regex)
+- `getUserProjectsValidator`: same `username` + `cursor` (optional string UUID) + `limit` (optional int 1–50)
 
 ---
 
@@ -1187,5 +1657,7 @@ npm run db:generate   # Generate new migration
 npm run db:push       # Push schema to database
 ```
 
-
-note: any agent reading this some apis maybe undocumented please then refer to the code always. Also fact check the api docs with the code at all times
+`dev` runs `tsx watch --import dotenv/config src/index.ts` (dotenv
+preloaded). On boot `initializeDatabase()` runs `SELECT 1`, then applies
+migrations from `./drizzle`, and exits (`process.exit(1)`) on failure; Redis
+connects before `app.listen(PORT)` (`PORT` default `5050`).
