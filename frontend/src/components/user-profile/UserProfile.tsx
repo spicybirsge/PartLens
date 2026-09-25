@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import InfiniteScroll from "react-infinite-scroll-component"
-import { Box, CalendarDays, Pencil } from "lucide-react"
+import { ArrowLeft, Box, CalendarDays, Pencil, Share2 } from "lucide-react"
 
 import DashboardSidebar from "@/components/DashboardSidebar"
 import Navbar from "@/components/Navbar"
@@ -258,21 +258,69 @@ export default function UserProfile() {
     user && profile && user.username === profile.username,
   )
 
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back()
+    } else {
+      router.push("/")
+    }
+  }
+
+  const handleShare = async () => {
+    if (!profile) return
+    const url = `${vars.FRONTEND_URL}/user/${profile.username}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.add({
+        type: "success",
+        title: "Link copied",
+        description: "Profile URL copied to clipboard.",
+      })
+    } catch {
+      toast.add({
+        type: "error",
+        title: "Could not copy link",
+        description: "Copy the URL from the address bar instead.",
+      })
+    }
+  }
+
   if (!loaded) return <PageLoading />
 
   const content = (
     <main className="min-w-0 flex-1 bg-muted/30">
       <div className="mx-auto min-h-svh w-full max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
-        {user && (
-          <div className="mb-6 flex items-center gap-3">
-            <SidebarTrigger
-              variant="outline"
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            {user && (
+              <SidebarTrigger
+                variant="outline"
+                size="icon"
+                aria-label="Toggle navigation"
+              />
+            )}
+            <Button
+              type="button"
+              variant="ghost"
               size="icon"
-              aria-label="Toggle navigation"
-            />
+              onClick={handleBack}
+              aria-label="Go back"
+            >
+              <ArrowLeft />
+            </Button>
             <p className="text-sm text-muted-foreground">Public profile</p>
           </div>
-        )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void handleShare()}
+            disabled={!profile}
+          >
+            <Share2 />
+            <span className="hidden sm:inline">Share</span>
+          </Button>
+        </div>
 
         {profileLoading ? (
           <ProfileSkeleton />
