@@ -8,19 +8,8 @@ Our system allows you to click on a machine part and inside the 3D render icon a
 ## Techstack
 Nextjs, with an express backend. Postgresql for datastoring with drizzle. And redis to store certain values for fast access with expiry + caching and ratelimiting.
 
-## Images
-<img width="640" height="292" alt="image" src="https://github.com/user-attachments/assets/dd46c9ef-0ae9-4e1b-942a-ee9be0eee43e" />
-<img width="640" height="288" alt="image" src="https://github.com/user-attachments/assets/8c8dd66f-c5a3-4249-a09f-56d7bab95027" />
-<img width="640" height="292" alt="image" src="https://github.com/user-attachments/assets/ac0941e8-4711-4c82-82c3-070aac70b03e" />
-<img width="640" height="292" alt="image" src="https://github.com/user-attachments/assets/f76d81ce-42a4-4076-aa1b-e06c548e3a1f" />
-<img width="524" height="293" alt="image" src="https://github.com/user-attachments/assets/f6e216da-badf-44b1-9cc5-aedd9d41bcac" />
-<img width="638" height="293" alt="image" src="https://github.com/user-attachments/assets/d8f87eeb-2b4d-4aea-b819-57a5b9212bef" />
-
-
-
-
-
-
+## Api Docs
+Api docs are available [here](https://github.com/spicybirsge/PartLens/blob/main/backend/api_docs.md)
 
 ## Deploying
 
@@ -140,3 +129,10 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Contributing
 Got any contributions? Please open a pull request.
+## Images
+<img width="640" height="292" alt="image" src="https://github.com/user-attachments/assets/dd46c9ef-0ae9-4e1b-942a-ee9be0eee43e" />
+<img width="640" height="288" alt="image" src="https://github.com/user-attachments/assets/8c8dd66f-c5a3-4249-a09f-56d7bab95027" />
+<img width="640" height="292" alt="image" src="https://github.com/user-attachments/assets/ac0941e8-4711-4c82-82c3-070aac70b03e" />
+<img width="640" height="292" alt="image" src="https://github.com/user-attachments/assets/f76d81ce-42a4-4076-aa1b-e06c548e3a1f" />
+<img width="524" height="293" alt="image" src="https://github.com/user-attachments/assets/f6e216da-badf-44b1-9cc5-aedd9d41bcac" />
+<img width="638" height="293" alt="image" src="https://github.com/user-attachments/assets/d8f87eeb-2b4d-4aea-b819-57a5b9212bef" />
