@@ -24,21 +24,30 @@ const sharedOptions = {
     handler: rateLimitHandler,
 };
 
-export const authRateLimit = rateLimit({
+const createLazyRateLimit = (createLimiter: () => RequestHandler): RequestHandler => {
+    let limiter: RequestHandler | undefined;
+
+    return (req, res, next) => {
+        limiter ??= createLimiter();
+        return limiter(req, res, next);
+    };
+};
+
+export const authRateLimit = createLazyRateLimit(() => rateLimit({
     ...sharedOptions,
     windowMs: 15 * 60 * 1000,
     limit: 20,
     store: createRedisStore("auth"),
-});
+}));
 
-export const generalRateLimit = rateLimit({
+export const generalRateLimit = createLazyRateLimit(() => rateLimit({
     ...sharedOptions,
     windowMs: 60 * 1000,
     limit: 300,
     store: createRedisStore("general"),
-});
+}));
 
-export const uploadRateLimit = rateLimit({
+export const uploadRateLimit = createLazyRateLimit(() => rateLimit({
     ...sharedOptions,
     windowMs: 60 * 60 * 1000,
     limit: 20,
@@ -48,4 +57,4 @@ export const uploadRateLimit = rateLimit({
         : req.ip
             ? `ip:${ipKeyGenerator(req.ip)}`
             : "ip:unknown",
-});
+}));

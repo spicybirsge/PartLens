@@ -3,6 +3,8 @@
 The backend uses `express-rate-limit` with `rate-limit-redis`, backed by the
 existing Redis client. The counters are shared across backend instances and use
 fixed windows. Each policy counts every request, including failed requests.
+The limiters initialize lazily on the first request, after the server's Redis
+connection has been established.
 
 | API category | Limit | Counter key | Scope |
 | --- | --- | --- | --- |
