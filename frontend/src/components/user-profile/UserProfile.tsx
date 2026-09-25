@@ -297,7 +297,7 @@ export default function UserProfile() {
         ) : (
           <>
             <Card>
-              <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:gap-5">
+              <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:gap-5">
                 <Avatar size="lg" className="size-16 shrink-0 sm:size-20">
                   <AvatarImage
                     src={profile.avatarUrl || undefined}
