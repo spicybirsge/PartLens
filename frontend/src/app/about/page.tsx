@@ -125,7 +125,7 @@ export default function Page() {
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">The approach</p>
                 <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Designed around the way people work.</h2>
               </div>
-              <p className="max-w-xs text-sm leading-6 text-muted-foreground">A direct path from context, to identification, to action.</p>
+           
             </div>
             <div className="grid divide-y border-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
               {principles.map((principle) => {
