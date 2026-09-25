@@ -1,47 +1,128 @@
-# Structure
-```txt
-User
- │
- ├── Sign up / Log in
- │
- └── Profile
-      │
-      ├── My Machines
-      │    │
-      │    ├── Machine A
-      │    │    ├── 3D Model
-      │    │    ├── All Manuals
-      │    │    └── Parts
-      │    │         ├── Part 001 → Manuals
-      │    │         ├── Part 002 → Manuals
-      │    │         └── Part 003 → Manuals
-      │    │
-      │    └── Machine B
-      │         └── ...
-      │
-      └── Bookmarks
-           ├── Bookmarked Machines
-           └── Bookmarked Manuals
+# PartLens
 
+## About
+PartLens is an documentation platform mainly aimed at documenting 3d machine diagrams by uploading manuals. 3D glb file of machine is uploaded into the system, then you can upload manuals/pdfs for a specific part in that machine.
+
+Our system allows you to click on a machine part and inside the 3D render icon and it would automatically select it.
+
+## Techstack
+Nextjs, with an express backend. Postgresql for datastoring with drizzle. And redis.
+
+## Deploying
+
+### Prerequisites
+
+- Node.js 20+ and npm
+- PostgreSQL database (`POSTGRES_URL`)
+- Redis instance (`REDIS_URL`)
+- ImageKit account (`IMAGEKIT_PUBLIC_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT`)
+- Google OAuth client (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
+
+Services run locally on:
+
+- Backend: `http://localhost:5050`
+- Frontend: `http://localhost:3000`
+
+### 1. Backend setup
+
+```bash
+cd backend
+npm install
+cp .env.example .env
 ```
 
+Fill in `.env` (see `backend/.env.example` and `backend/api_docs.md` for details):
 
-# MVP
+```text
+POSTGRES_URL=
+REDIS_URL=
+REDIS_PREFIX=
+ADMIN_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+FRONTEND_URL=http://localhost:3000
+BACKEND_URL=http://localhost:5050
+IMAGEKIT_PUBLIC_KEY=
+IMAGEKIT_PRIVATE_KEY=
+IMAGEKIT_URL_ENDPOINT=
+PORT=5050
+NODE_ENV=development
+```
 
-1. user signup/login with google with session based auth
-2. shows a dashboard where u can create machines and upload their `.glb` file, also machine name and machine description will be their in create form. machine can be either public(show in search results or unlisted, wont show in search results). Link to a machine will be generated via nanoid. Also it will contain Page views
-3. After that you can upload manual/docs in `.pdf` on how to operate that particular machine part after creation in manage machine page. Every time you upload a pdf it will ask for the part name inside that machine which it refers to, should match what is in the .glb for it to show when that part is clicked, if doesnt exist simply doesnt matter.
+In the Google Cloud Console, add this OAuth redirect URI:
 
-`Also: All files are uploaded to imagekit`
+```text
+http://localhost:5050/api/v1/auth/google/callback
+```
 
-4. Basic functions like delete machine deletes it from the system, update details etc
-5. Optional low priority: bookmark allows users to bookmark others machines or manuals
-6. Search function allows users to search manuals or machines
+Then apply migrations and start the dev server (auto-applies migrations on boot, port `5050`):
 
-Functionality basic:
-when user visits without signing it default front facing page will be a search with top 10 most viewed public machines
-When signed in, it it takes u to the dashboard.
+```bash
+npm run db:migrate
+npm run dev
+```
 
+Verify: `GET http://localhost:5050/status`
 
-Techstack:
-Nextjs, express+postgress with drizzle
+Other backend commands:
+
+```bash
+npm run build   # compile TypeScript to dist/
+npm start       # run compiled server (production)
+npm run db:generate  # generate a migration from schema changes
+npm run db:push      # push schema directly (dev only)
+```
+
+### 2. Frontend setup
+
+The frontend uses hardcoded URLs in `frontend/src/vars/vars.tsx`:
+
+```ts
+BACKEND_URL: 'http://localhost:5050'
+FRONTEND_URL: 'http://localhost:3000'
+```
+
+For local development the defaults work as-is. For production, update both values to your deployed URLs before building.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Development startup order
+
+1. Start PostgreSQL and Redis.
+2. Start backend (`cd backend && npm run dev`).
+3. Start frontend (`cd frontend && npm run dev`).
+
+### Production deployment
+
+1. Provision managed PostgreSQL and Redis, plus ImageKit and Google OAuth credentials.
+2. Set backend environment variables with production values:
+   `NODE_ENV=production`, public `FRONTEND_URL` / `BACKEND_URL`, real `POSTGRES_URL`, `REDIS_URL`, ImageKit and Google keys, strong `ADMIN_KEY`.
+   The backend sets `trust proxy` automatically when `NODE_ENV=production`.
+3. Add the production OAuth redirect URI in Google Cloud Console:
+   `https://<your-backend>/api/v1/auth/google/callback`
+4. Deploy backend:
+   ```bash
+   cd backend
+   npm install
+   npm run build
+   npm run db:migrate
+   npm start
+   ```
+5. Deploy frontend: update `frontend/src/vars/vars.tsx` to your public `BACKEND_URL` / `FRONTEND_URL`, then:
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   npm start
+   ```
+   Or host the frontend on Vercel/another Node host serving `next start` on port `3000`.
+6. Verify production: `GET https://<your-backend>/status` and load the frontend URL, then test Google login and a GLB/PDF upload.
+
+## Contributing
+Got any contributions? Please open a pull request.
