@@ -1,4 +1,4 @@
-import { body } from 'express-validator';
+import { body, query } from 'express-validator';
 
 const allowedImageExtensions = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
 const allowedImageMimeTypes = new Set([
@@ -75,4 +75,38 @@ export const updateUserValidator = [
         clearTimeout(timeout);
       }
     }),
+];
+
+export const getUserProfileValidator = [
+  query('username')
+    .exists({ checkFalsy: true }).withMessage('username is required')
+    .bail()
+    .isString().withMessage('username must be a string')
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 30 }).withMessage('username must be between 1 and 30 characters')
+    .bail()
+    .matches(/^[a-zA-Z0-9_-]+$/).withMessage('username must contain only letters, numbers, underscores, or hyphens'),
+];
+
+export const getUserProjectsValidator = [
+  query('username')
+    .exists({ checkFalsy: true }).withMessage('username is required')
+    .bail()
+    .isString().withMessage('username must be a string')
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 30 }).withMessage('username must be between 1 and 30 characters')
+    .bail()
+    .matches(/^[a-zA-Z0-9_-]+$/).withMessage('username must contain only letters, numbers, underscores, or hyphens'),
+
+  query('cursor')
+    .optional()
+    .isString().withMessage('cursor must be a string')
+    .bail()
+    .isUUID('all').withMessage('cursor must be a valid UUID'),
+
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 }).withMessage('limit must be an integer between 1 and 50'),
 ];

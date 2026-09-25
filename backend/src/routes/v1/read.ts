@@ -6,9 +6,132 @@ import verifySession from "../../middleware/verifySession.js";
 import isAuthenticated from "../../middleware/isAuthenticated.js";
 import { validate } from "../../middleware/validate.js";
 import { listBookmarksValidator } from "../../validators/bookmark.validator.js";
+import { getUserProfileValidator, getUserProjectsValidator } from "../../validators/user.validator.js";
 import { paginate } from "../../lib/pagination.js";
 
 const router = express.Router()
+
+router.get('/user', validate(getUserProfileValidator), async (req, res) => {
+        const username = String(req.query.username).trim();
+
+        const [user] = await database
+                .select({
+                        id: usersTable.id,
+                        username: usersTable.username,
+                        name: usersTable.name,
+                        avatarUrl: usersTable.avatarUrl,
+                        createdAt: usersTable.createdAt,
+                })
+                .from(usersTable)
+                .where(eq(usersTable.username, username))
+                .limit(1);
+
+        if (!user) {
+                return res.status(404).json({
+                        success: false,
+                        message: "User not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        return res.status(200).json({
+                success: true,
+                message: "User profile retrieved",
+                data: user,
+                code: 200,
+        });
+});
+
+router.get('/user/projects', validate(getUserProjectsValidator), async (req, res) => {
+        const username = String(req.query.username).trim();
+        const rawCursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+        const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
+
+        const [user] = await database
+                .select({ id: usersTable.id })
+                .from(usersTable)
+                .where(eq(usersTable.username, username))
+                .limit(1);
+
+        if (!user) {
+                return res.status(404).json({
+                        success: false,
+                        message: "User not found",
+                        data: null,
+                        code: 404,
+                });
+        }
+
+        const conditions = [
+                eq(projectTable.userId, user.id),
+                eq(projectTable.unlisted, false),
+        ];
+        if (rawCursor) {
+                conditions.push(lt(projectTable.id, rawCursor));
+        }
+
+        const rows = await database
+                .select({
+                        id: projectTable.id,
+                        publicId: projectTable.publicId,
+                        name: projectTable.name,
+                        description: projectTable.description,
+                        glbFileUrl: projectTable.glbFileUrl,
+                        unlisted: projectTable.unlisted,
+                        createdAt: projectTable.createdAt,
+                        updatedAt: projectTable.updatedAt,
+                })
+                .from(projectTable)
+                .where(and(...conditions))
+                .orderBy(desc(projectTable.id))
+                .limit(limit + 1);
+
+        const { items, hasMore, nextCursor } = paginate(rows, limit);
+
+        const projectIds = items.map((project) => project.id);
+        let partsCounts = new Map<string, number>();
+        let viewCounts = new Map<string, number>();
+        if (projectIds.length > 0) {
+                const [partsByProject, viewsByProject] = await Promise.all([
+                        database
+                                .select({
+                                        projectId: partsTable.projectId,
+                                        count: count(),
+                                })
+                                .from(partsTable)
+                                .where(inArray(partsTable.projectId, projectIds))
+                                .groupBy(partsTable.projectId),
+                        database
+                                .select({
+                                        projectId: projectViewsTable.projectId,
+                                        count: count(),
+                                })
+                                .from(projectViewsTable)
+                                .where(inArray(projectViewsTable.projectId, projectIds))
+                                .groupBy(projectViewsTable.projectId),
+                ]);
+                partsCounts = new Map(
+                        partsByProject.map((row) => [row.projectId, Number(row.count)]),
+                );
+                viewCounts = new Map(
+                        viewsByProject.map((row) => [row.projectId, Number(row.count)]),
+                );
+        }
+
+        const data = items.map((project) => ({
+                ...project,
+                parts: partsCounts.get(project.id) ?? 0,
+                views: viewCounts.get(project.id) ?? 0,
+        }));
+
+        return res.status(200).json({
+                success: true,
+                message: "User projects retrieved",
+                data: { items: data, nextCursor, hasMore },
+                code: 200,
+        });
+});
 
 router.get('/projects', verifySession, async (req, res) => {
         const projects = await database
