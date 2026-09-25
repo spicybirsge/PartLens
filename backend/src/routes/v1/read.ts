@@ -1,13 +1,15 @@
 import express from "express"
-import { and, count, eq, gte, inArray, desc, lt } from "drizzle-orm";
+import { and, asc, count, eq, gte, ilike, inArray, desc, lt, or, sql } from "drizzle-orm";
 import { database } from "../../db/index.js";
 import { partsTable, partManualsTable, projectTable, projectViewsTable, usersTable, projectBookmarksTable, partBookmarksTable } from "../../db/schema.js";
 import verifySession from "../../middleware/verifySession.js";
 import isAuthenticated from "../../middleware/isAuthenticated.js";
 import { validate } from "../../middleware/validate.js";
 import { listBookmarksValidator } from "../../validators/bookmark.validator.js";
+import { discoverProjectsValidator, searchProjectsValidator } from "../../validators/project.validator.js";
 import { getUserProfileValidator, getUserProjectsValidator } from "../../validators/user.validator.js";
-import { paginate } from "../../lib/pagination.js";
+import { paginate, paginateOffset } from "../../lib/pagination.js";
+import { escapeLikePattern } from "../../lib/escapeLike.js";
 
 const router = express.Router()
 
@@ -200,6 +202,152 @@ router.get('/projects', verifySession, async (req, res) => {
                         total_parts: data.reduce((total, project) => total + project.parts, 0),
                         total_views: data.reduce((total, project) => total + project.views, 0),
                 },
+                code: 200,
+        });
+});
+
+router.get('/search/projects', validate(searchProjectsValidator), async (req, res) => {
+        const q = String(req.query.q).trim();
+        const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
+        const offset = typeof req.query.cursor === "string" ? Number(req.query.cursor) : 0;
+
+        const escapedRaw = escapeLikePattern(q);
+        const containsRaw = `%${escapedRaw}%`;
+
+        const lowerQ = q.toLowerCase();
+        const escapedLower = escapeLikePattern(lowerQ);
+        const relevanceExpr = sql<number>`CASE WHEN lower(${projectTable.name}) = ${lowerQ} THEN 0 WHEN lower(${projectTable.name}) LIKE ${`${escapedLower}%`} ESCAPE '\\' THEN 1 WHEN lower(${projectTable.name}) LIKE ${`%${escapedLower}%`} ESCAPE '\\' THEN 2 ELSE 3 END`;
+
+        const viewCount = count(projectViewsTable.id);
+
+        const rows = await database
+                .select({
+                        id: projectTable.id,
+                        publicId: projectTable.publicId,
+                        name: projectTable.name,
+                        description: projectTable.description,
+                        glbFileUrl: projectTable.glbFileUrl,
+                        createdAt: projectTable.createdAt,
+                        updatedAt: projectTable.updatedAt,
+                        owner: {
+                                username: usersTable.username,
+                                name: usersTable.name,
+                                avatarUrl: usersTable.avatarUrl,
+                        },
+                        views: viewCount,
+                        relevance: relevanceExpr,
+                })
+                .from(projectTable)
+                .innerJoin(usersTable, eq(projectTable.userId, usersTable.id))
+                .leftJoin(projectViewsTable, eq(projectViewsTable.projectId, projectTable.id))
+                .where(and(
+                        eq(projectTable.unlisted, false),
+                        or(
+                                ilike(projectTable.name, containsRaw),
+                                ilike(projectTable.description, containsRaw),
+                        ),
+                ))
+                .groupBy(projectTable.id, usersTable.id)
+                .orderBy(asc(relevanceExpr), desc(viewCount), desc(projectTable.createdAt), desc(projectTable.id))
+                .limit(limit + 1)
+                .offset(offset);
+
+        const { items: page, hasMore, nextCursor } = paginateOffset(rows, limit, offset);
+
+        const projectIds = page.map((row) => row.id);
+        let partsCounts = new Map<string, number>();
+        if (projectIds.length > 0) {
+                const partsByProject = await database
+                        .select({
+                                projectId: partsTable.projectId,
+                                count: count(),
+                        })
+                        .from(partsTable)
+                        .where(inArray(partsTable.projectId, projectIds))
+                        .groupBy(partsTable.projectId);
+                partsCounts = new Map(
+                        partsByProject.map((row) => [row.projectId, Number(row.count)]),
+                );
+        }
+
+        const items = page.map(({ relevance, views, ...project }) => ({
+                ...project,
+                views: Number(views),
+                parts: partsCounts.get(project.id) ?? 0,
+        }));
+
+        return res.status(200).json({
+                success: true,
+                message: "Project search completed",
+                data: { items, nextCursor, hasMore },
+                code: 200,
+        });
+});
+
+router.get('/projects/discover', validate(discoverProjectsValidator), async (req, res) => {
+        const sort = typeof req.query.sort === "string" ? req.query.sort : "newest";
+        const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
+        const offset = typeof req.query.cursor === "string" ? Number(req.query.cursor) : 0;
+
+        const viewCount = count(projectViewsTable.id);
+
+        const orderBy = sort === "top"
+                ? [desc(viewCount), desc(projectTable.createdAt), desc(projectTable.id)]
+                : [desc(projectTable.createdAt), desc(projectTable.id)];
+
+        const rows = await database
+                .select({
+                        id: projectTable.id,
+                        publicId: projectTable.publicId,
+                        name: projectTable.name,
+                        description: projectTable.description,
+                        glbFileUrl: projectTable.glbFileUrl,
+                        createdAt: projectTable.createdAt,
+                        updatedAt: projectTable.updatedAt,
+                        owner: {
+                                username: usersTable.username,
+                                name: usersTable.name,
+                                avatarUrl: usersTable.avatarUrl,
+                        },
+                        views: viewCount,
+                })
+                .from(projectTable)
+                .innerJoin(usersTable, eq(projectTable.userId, usersTable.id))
+                .leftJoin(projectViewsTable, eq(projectViewsTable.projectId, projectTable.id))
+                .where(eq(projectTable.unlisted, false))
+                .groupBy(projectTable.id, usersTable.id)
+                .orderBy(...orderBy)
+                .limit(limit + 1)
+                .offset(offset);
+
+        const { items: page, hasMore, nextCursor } = paginateOffset(rows, limit, offset);
+
+        const projectIds = page.map((row) => row.id);
+        let partsCounts = new Map<string, number>();
+        if (projectIds.length > 0) {
+                const partsByProject = await database
+                        .select({
+                                projectId: partsTable.projectId,
+                                count: count(),
+                        })
+                        .from(partsTable)
+                        .where(inArray(partsTable.projectId, projectIds))
+                        .groupBy(partsTable.projectId);
+                partsCounts = new Map(
+                        partsByProject.map((row) => [row.projectId, Number(row.count)]),
+                );
+        }
+
+        const items = page.map(({ views, ...project }) => ({
+                ...project,
+                views: Number(views),
+                parts: partsCounts.get(project.id) ?? 0,
+        }));
+
+        return res.status(200).json({
+                success: true,
+                message: sort === "top" ? "Top projects retrieved" : "Newest projects retrieved",
+                data: { items, nextCursor, hasMore },
                 code: 200,
         });
 });

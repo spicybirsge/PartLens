@@ -1,6 +1,6 @@
 //to whom it may concern this is project.validator.ts so any validations related to fetching projects or its related tables go in here.
 
-import { body } from 'express-validator';
+import { body, query } from 'express-validator';
 
 const allowedGlbMimeTypes = new Set([
   "model/gltf-binary",
@@ -131,4 +131,38 @@ export const updateProjectValidator = [
   body('unlisted')
     .optional()
     .isBoolean().withMessage('unlisted must be a boolean'),
+];
+
+export const searchProjectsValidator = [
+  query('q')
+    .exists({ checkFalsy: true }).withMessage('q is required')
+    .bail()
+    .isString().withMessage('q must be a string')
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 200 }).withMessage('q must be between 1 and 200 characters'),
+
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 }).withMessage('limit must be an integer between 1 and 50'),
+
+  query('cursor')
+    .optional()
+    .isInt({ min: 0 }).withMessage('cursor must be a non-negative integer offset'),
+];
+
+export const discoverProjectsValidator = [
+  query('sort')
+    .optional()
+    .isString().withMessage('sort must be a string')
+    .bail()
+    .isIn(['top', 'newest']).withMessage("sort must be 'top' or 'newest'"),
+
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 }).withMessage('limit must be an integer between 1 and 50'),
+
+  query('cursor')
+    .optional()
+    .isInt({ min: 0 }).withMessage('cursor must be a non-negative integer offset'),
 ];

@@ -392,6 +392,105 @@ GET /api/v1/read/projects
 
 > Returns only projects owned by the authenticated user, ordered by `updatedAt` descending. Includes part counts and view counts per project.
 
+### Search Public Projects (Infinite Scroll)
+
+```
+GET /api/v1/read/search/projects?q=<query>&limit=10&cursor=0
+```
+
+**Public endpoint.** No authentication required. Only projects with `unlisted = false` are searched.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `q` | string | ✅ Yes | Search text, 1–200 chars. Matched case-insensitively against project `name` and `description` via substring (`ILIKE %q%`) |
+| `limit` | integer | No | Page size, 1–50 (default `10`) |
+| `cursor` | integer | No | Zero-based offset for infinite scroll (default `0`). Pass back `nextCursor` from the previous response |
+
+**Relevance ordering:**
+
+1. `name` equals `q` (case-insensitive)
+2. `name` starts with `q`
+3. `name` contains `q`
+4. `description` contains `q` (name did not match)
+
+Ties are broken by view count (`DESC`), then `createdAt` (`DESC`), then `id` (`DESC`).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Project search completed",
+  "data": {
+    "items": [
+      {
+        "id": "uuid",
+        "publicId": "string",
+        "name": "string",
+        "description": "string|null",
+        "glbFileUrl": "string",
+        "createdAt": "ISO8601",
+        "updatedAt": "ISO8601",
+        "owner": {
+          "username": "string",
+          "name": "string",
+          "avatarUrl": "string|null"
+        },
+        "views": 0,
+        "parts": 0
+      }
+    ],
+    "nextCursor": "10",
+    "hasMore": true
+  },
+  "code": 200
+}
+```
+
+> `nextCursor` is the `cursor` value to pass on the next request, or `null` when there are no more pages. `LIKE` wildcards (`%`, `_`, `\`) in `q` are escaped so they are treated literally.
+
+### Discover Public Projects (Infinite Scroll)
+
+```
+GET /api/v1/read/projects/discover?sort=newest&limit=10&cursor=0
+```
+
+**Public endpoint.** No authentication required. Only projects with `unlisted = false` are returned.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `sort` | string | No | `'newest'` (default) or `'top'` |
+| `limit` | integer | No | Page size, 1–50 (default `10`) |
+| `cursor` | integer | No | Zero-based offset for infinite scroll (default `0`). Pass back `nextCursor` from the previous response |
+
+**Sort behavior:**
+
+* `sort=newest` → ordered by `createdAt` `DESC`, then `id` `DESC`
+* `sort=top` → ordered by view count (`COUNT(project_views)`) `DESC`, then `createdAt` `DESC`, then `id` `DESC`
+
+View count is the number of rows in `project_views` for the project (one row per unique viewer IP).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Newest projects retrieved",
+  "data": {
+    "items": [ { ...same project shape as search... } ],
+    "nextCursor": "10",
+    "hasMore": true
+  },
+  "code": 200
+}
+```
+
+> `message` is `"Top projects retrieved"` when `sort=top`. `nextCursor`/`hasMore` work the same as the search endpoint.
+
 ### Get Project Details (Owner)
 
 ```
