@@ -6,7 +6,7 @@ PartLens is an documentation platform mainly aimed at documenting 3d machine dia
 Our system allows you to click on a machine part and inside the 3D render icon and it would automatically select it.
 
 ## Techstack
-Nextjs, with an express backend. Postgresql for datastoring with drizzle. And redis.
+Nextjs, with an express backend. Postgresql for datastoring with drizzle. And redis to store certain values for fast access with expiry + caching and ratelimiting.
 
 ## Deploying
 
