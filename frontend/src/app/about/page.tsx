@@ -148,7 +148,7 @@ export default function Page() {
         </section>
 
         <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-          <div className="flex flex-col items-start justify-between gap-8 border bg-foreground p-8 text-background sm:p-12 lg:flex-row lg:items-center">
+          <div className="flex flex-col items-start justify-between gap-8 border bg-foreground p-8 text-background sm:p-12 lg:flex-row lg:items-center rounded-lg">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-background/60">Start with the machine</p>
               <h2 className="mt-4 max-w-xl text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Make technical knowledge easier to reach.</h2>
