@@ -139,3 +139,94 @@
     cursor: pointer;
   }
 }
+
+/* About page motion — CSS-only, respects reduced motion */
+.reveal {
+  opacity: 0;
+  transform: translateY(var(--reveal-y, 18px));
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes about-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes about-float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes about-spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes about-ping-soft {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.about-animate-fade-up {
+  opacity: 0;
+  animation: about-fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.about-float {
+  animation: about-float-y 5s ease-in-out infinite;
+}
+
+.about-float-delayed {
+  animation: about-float-y 6s ease-in-out 0.8s infinite;
+}
+
+.about-spin-slower {
+  animation: about-spin-slow 28s linear infinite;
+}
+
+.about-ping-soft {
+  animation: about-ping-soft 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .about-animate-fade-up,
+  .about-float,
+  .about-float-delayed,
+  .about-spin-slower,
+  .about-ping-soft {
+    animation: none;
+    opacity: 1;
+  }
+}
