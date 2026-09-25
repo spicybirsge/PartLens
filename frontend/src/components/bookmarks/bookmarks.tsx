@@ -305,10 +305,10 @@ export default function Bookmarks() {
     <DashboardSidebar>
       <main className="min-w-0 flex-1 bg-muted/30">
         <div className="mx-auto min-h-svh w-full max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
               <SidebarTrigger variant="outline" size="icon" aria-label="Toggle navigation" />
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">Manage your bookmarks</p>
                 <h1 className="mt-1 text-2xl font-semibold tracking-tight">Bookmarks</h1>
               </div>
@@ -316,7 +316,7 @@ export default function Bookmarks() {
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="outline" className="shrink-0">
+                  <Button variant="outline" className="w-full justify-between sm:w-auto sm:shrink-0">
                     {FILTER_LABELS[filter]}
                     <ChevronDown />
                   </Button>

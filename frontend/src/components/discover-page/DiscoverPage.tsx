@@ -215,25 +215,10 @@ export default function DiscoverPage({
   return (
     <main className="min-w-0 flex-1 bg-muted/30">
       <div className="mx-auto min-h-svh w-full max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {sidebarToggle}
-          <form
-            onSubmit={handleSubmit}
-            role="search"
-            className="mx-auto flex w-full max-w-xl flex-1 items-center gap-2"
-          >
-            <Input
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder="Search projects by name or description…"
-              aria-label="Search projects"
-              className="h-10"
-            />
-            <Button type="submit" size="icon" aria-label="Search">
-              <Search />
-            </Button>
-          </form>
           {!isSearching && (
+            <div className="order-2 ml-auto sm:order-3 sm:ml-0">
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -255,7 +240,24 @@ export default function DiscoverPage({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           )}
+          <form
+            onSubmit={handleSubmit}
+            role="search"
+            className="order-3 flex w-full basis-full items-center gap-2 sm:order-2 sm:mx-auto sm:w-auto sm:max-w-xl sm:flex-1"
+          >
+            <Input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Search projects by name or description…"
+              aria-label="Search projects"
+              className="h-10 min-w-0"
+            />
+            <Button type="submit" size="icon" aria-label="Search" className="shrink-0">
+              <Search />
+            </Button>
+          </form>
         </div>
 
         <div className="mt-4 flex min-h-6 flex-wrap items-center justify-between gap-2">
