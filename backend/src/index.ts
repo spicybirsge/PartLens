@@ -4,6 +4,7 @@ import logger from "morgan"
 import cors from "cors"
 import errorHandler from "./middleware/errorHandler.js";
 import isAdminRequest from "./middleware/isAdminRequest.js";
+import { authRateLimit, generalRateLimit } from "./middleware/ratelimits.js";
 
 import authRoutes from "./routes/v1/auth.js"
 import createRoutes from "./routes/v1/create.js"
@@ -38,12 +39,12 @@ if (process.env.NODE_ENV === 'production') {
 
 
 
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/create', createRoutes);
-app.use('/api/v1/delete', deleteRoutes);
-app.use('/api/v1/read', readRoutes);
-app.use('/api/v1/update', updateRoutes);
-app.use('/api/v1/upload', uploadRoutes);
+app.use('/api/v1/auth', authRateLimit, authRoutes);
+app.use('/api/v1/create', generalRateLimit, createRoutes);
+app.use('/api/v1/delete', generalRateLimit, deleteRoutes);
+app.use('/api/v1/read', generalRateLimit, readRoutes);
+app.use('/api/v1/update', generalRateLimit, updateRoutes);
+app.use('/api/v1/upload', generalRateLimit, uploadRoutes);
 
 
 
@@ -103,6 +104,5 @@ const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => {
     console.log(`[^] Server is running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
 })
-
 
 

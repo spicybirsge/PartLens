@@ -4,6 +4,7 @@ import path from "node:path";
 import ImageKit, { toFile } from "@imagekit/nodejs";
 import { nanoid } from "nanoid";
 import verifySession from "../../middleware/verifySession.js";
+import { uploadRateLimit } from "../../middleware/ratelimits.js";
 
 const router = express.Router();
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
@@ -113,8 +114,8 @@ const handleUploadError: ErrorRequestHandler = (error, _req, res, next) => {
   return next(error);
 };
 
-router.post("/glb", verifySession, withUploadTimeout, createUploadMiddleware("glb"), handleUploadError, uploadToImageKit("glb"));
-router.post("/pdf", verifySession, withUploadTimeout, createUploadMiddleware("pdf"), handleUploadError, uploadToImageKit("pdf"));
-router.post("/image", verifySession, withUploadTimeout, createUploadMiddleware("image"), handleUploadError, uploadToImageKit("image"));
+router.post("/glb", verifySession, uploadRateLimit, withUploadTimeout, createUploadMiddleware("glb"), handleUploadError, uploadToImageKit("glb"));
+router.post("/pdf", verifySession, uploadRateLimit, withUploadTimeout, createUploadMiddleware("pdf"), handleUploadError, uploadToImageKit("pdf"));
+router.post("/image", verifySession, uploadRateLimit, withUploadTimeout, createUploadMiddleware("image"), handleUploadError, uploadToImageKit("image"));
 
 export default router;
