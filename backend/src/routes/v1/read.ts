@@ -35,10 +35,18 @@ router.get('/user', validate(getUserProfileValidator), async (req, res) => {
                 });
         }
 
+        const [projectCount] = await database
+                .select({ count: count() })
+                .from(projectTable)
+                .where(and(
+                        eq(projectTable.userId, user.id),
+                        eq(projectTable.unlisted, false),
+                ));
+
         return res.status(200).json({
                 success: true,
                 message: "User profile retrieved",
-                data: user,
+                data: { ...user, totalProjects: Number(projectCount?.count ?? 0) },
                 code: 200,
         });
 });
