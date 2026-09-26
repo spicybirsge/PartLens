@@ -13,8 +13,6 @@ import readRoutes from "./routes/v1/read.js"
 import updateRoutes from "./routes/v1/update.js"
 import uploadRoutes from "./routes/v1/upload.js"
 
-
-
 import { initializeDatabase, database } from "./db/index.js"
 import redisClient from "./redis/redisClient.js"
 import { sql } from 'drizzle-orm';
