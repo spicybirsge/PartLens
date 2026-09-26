@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Check, ImagePlus, LogOut, Monitor, RefreshCw, Sun, Moon, Laptop, Loader2, Trash2 } from "lucide-react"
+import { Check, ImagePlus, LogOut, Monitor, RefreshCw, Sun, Moon, Laptop, Loader2, Trash2, MoreVertical, TriangleAlert } from "lucide-react"
 import { useTheme } from "next-themes"
 import DashboardSidebar from "../DashboardSidebar"
 import PageLoading from "../PageLoading"
@@ -24,6 +24,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from "../ui/dialog"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "../ui/dropdown-menu"
 import { toast } from "../ui/toast"
 
 interface Session {
@@ -52,6 +58,11 @@ export default function SettingsPage() {
     const [sessionsError, setSessionsError] = useState<string | null>(null)
     const [isLoggingOutOthers, setIsLoggingOutOthers] = useState(false)
     const [confirmation, setConfirmation] = useState<Confirmation>(null)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [deleteStep, setDeleteStep] = useState<"warning" | "confirm">("warning")
+    const [deleteInput, setDeleteInput] = useState("")
+    const [deleteError, setDeleteError] = useState<string | null>(null)
+    const [isDeletingAccount, setIsDeletingAccount] = useState(false)
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
     const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null)
     const [removeImage, setRemoveImage] = useState(false)
@@ -249,6 +260,60 @@ export default function SettingsPage() {
         if (action === "logoutOthers") await handleLogoutOthers()
     }
 
+    const expectedDeleteUsername = useMemo(
+        () => (user?.username || "").toUpperCase(),
+        [user?.username]
+    )
+
+    const isDeleteInputValid =
+        deleteInput.length > 0 && deleteInput === expectedDeleteUsername
+
+    const openDeleteDialog = () => {
+        setDeleteStep("warning")
+        setDeleteInput("")
+        setDeleteError(null)
+        setDeleteDialogOpen(true)
+    }
+
+    const closeDeleteDialog = () => {
+        if (isDeletingAccount) return
+        setDeleteDialogOpen(false)
+        setDeleteStep("warning")
+        setDeleteInput("")
+        setDeleteError(null)
+    }
+
+    const handleDeleteAccount = async () => {
+        const currentToken = localStorage.getItem("token")
+        if (!currentToken) {
+            setDeleteError("You are not signed in.")
+            return
+        }
+        if (!isDeleteInputValid) return
+
+        setIsDeletingAccount(true)
+        setDeleteError(null)
+        try {
+            const response = await fetch(`${vars.BACKEND_URL}/api/v1/delete/account`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${currentToken}` },
+            })
+            const data = await response.json().catch(() => null)
+            if (!response.ok || !data?.success) {
+                throw new Error(data?.message || "Could not delete your account")
+            }
+            localStorage.removeItem("token")
+            setUser(null)
+            setDeleteDialogOpen(false)
+            showToast("Account deleted", "Your account has been permanently deleted.", "success")
+            router.push("/")
+        } catch (error) {
+            setDeleteError(error instanceof Error ? error.message : "Could not delete your account")
+        } finally {
+            setIsDeletingAccount(false)
+        }
+    }
+
     const handleImageSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0]
         if (!file) return
@@ -336,9 +401,26 @@ export default function SettingsPage() {
 
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Profile</CardTitle>
-                            <CardDescription>Update the details shown on your PartLens account.</CardDescription>
+                        <CardHeader className="flex flex-row items-start justify-between gap-4">
+                            <div>
+                                <CardTitle>Profile</CardTitle>
+                                <CardDescription>Update the details shown on your PartLens account.</CardDescription>
+                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger
+                                    render={
+                                        <Button variant="ghost" size="icon-sm" aria-label="Profile options">
+                                            <MoreVertical />
+                                        </Button>
+                                    }
+                                />
+                                <DropdownMenuContent align="end" className="w-44">
+                                    <DropdownMenuItem variant="destructive" onClick={openDeleteDialog}>
+                                        <Trash2 />
+                                        Delete account
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </CardHeader>
                         <CardContent>
                             <form className="space-y-5" onSubmit={handleProfileSubmit}>
@@ -575,6 +657,90 @@ export default function SettingsPage() {
                         {confirmation === "logoutOthers" ? "Log out other sessions" : "Log out"}
                     </Button>
                 </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog open={deleteDialogOpen} onOpenChange={(open) => !open && closeDeleteDialog()}>
+            <DialogContent>
+                {deleteStep === "warning" ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-destructive">
+                                <TriangleAlert className="size-5" />
+                                Delete account?
+                            </DialogTitle>
+                            <DialogDescription>
+                                Danger: this action is permanent and cannot be undone.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
+                            <p className="font-medium text-destructive">Everything associated with your account will be permanently removed, including:</p>
+                            <ul className="mt-2 list-disc space-y-1 pl-5 text-destructive/90">
+                                <li>Your profile and account details</li>
+                                <li>Your projects, parts, and uploaded manuals</li>
+                                <li>Your bookmarks and active sessions</li>
+                            </ul>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={closeDeleteDialog}>Cancel</Button>
+                            <Button type="button" variant="destructive" onClick={() => setDeleteStep("confirm")}>
+                                Continue
+                            </Button>
+                        </DialogFooter>
+                    </>
+                ) : (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-destructive">
+                                <TriangleAlert className="size-5" />
+                                Confirm account deletion
+                            </DialogTitle>
+                            <DialogDescription>
+                                To confirm, type your username <span className="font-semibold text-foreground">{expectedDeleteUsername}</span> in capital letters below.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form
+                            autoComplete="off"
+                            onSubmit={(event) => {
+                                event.preventDefault()
+                                void handleDeleteAccount()
+                            }}
+                        >
+                            <input type="text" name="prevent-autofill-username" autoComplete="off" tabIndex={-1} aria-hidden="true" className="hidden" />
+                            <label className="grid gap-2 text-sm font-medium">
+                                Username confirmation
+                                <Input
+                                    value={deleteInput}
+                                    onChange={(event) => {
+                                        setDeleteInput(event.target.value)
+                                        if (deleteError) setDeleteError(null)
+                                    }}
+                                    placeholder={expectedDeleteUsername}
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    autoCapitalize="characters"
+                                    spellCheck={false}
+                                    name="delete-account-confirmation"
+                                    id="delete-account-confirmation"
+                                    aria-invalid={Boolean(deleteError)}
+                                />
+                                <span className="text-xs font-normal text-muted-foreground">
+                                    Type <span className="font-mono font-semibold">{expectedDeleteUsername}</span> exactly to enable deletion.
+                                </span>
+                            </label>
+                            {deleteError && <p className="mt-2 text-sm text-destructive">{deleteError}</p>}
+                            <DialogFooter className="mt-4">
+                                <Button type="button" variant="outline" onClick={() => setDeleteStep("warning")} disabled={isDeletingAccount}>
+                                    Back
+                                </Button>
+                                <Button type="submit" variant="destructive" disabled={!isDeleteInputValid || isDeletingAccount}>
+                                    {isDeletingAccount && <Loader2 className="animate-spin" />}
+                                    {isDeletingAccount ? "Deleting..." : "Delete my account"}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </>
+                )}
             </DialogContent>
         </Dialog>
     </>)

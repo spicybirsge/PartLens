@@ -4,7 +4,7 @@ import { validate } from "../../middleware/validate.js";
 import { deleteManualValidator, deletePartValidator } from "../../validators/manual.validator.js";
 import { deleteProjectBookmarkValidator, deletePartBookmarkValidator } from "../../validators/bookmark.validator.js";
 import { database } from "../../db/index.js";
-import { partManualsTable, partsTable, projectTable, projectBookmarksTable, partBookmarksTable } from "../../db/schema.js";
+import { partManualsTable, partsTable, projectTable, projectBookmarksTable, partBookmarksTable, usersTable } from "../../db/schema.js";
 import { and, eq } from "drizzle-orm";
 
 const router = express.Router()
@@ -208,6 +208,29 @@ router.delete('/bookmark/part/:partId', verifySession, validate(deletePartBookma
     code: 200,
   });
 });
+
+router.delete("/account", verifySession, async (req, res) => {
+  const [deletedUser] = await database
+    .delete(usersTable)
+    .where(eq(usersTable.id, req.user!.id))
+    .returning({ id: usersTable.id });
+
+  if (!deletedUser) {
+    return res.status(404).json({
+      success: false,
+      message: "Account not found",
+      data: null,
+      code: 404,
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Account deleted",
+    data: { id: deletedUser.id },
+    code: 200,
+  });
+})
 
 
 export default router
