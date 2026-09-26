@@ -116,10 +116,13 @@ consent to such transfers as necessary to operate it.
 - **View records** for a project are removed when the project is deleted.
 - **Backups and logs** age out on their own schedules; residual copies may
   persist for a limited time.
-- **Account deletion** is currently handled on request: email us from your
-  account address and we will delete your account record (which cascades to
-  your projects and sessions). Note that copies of previously public Content
-  may survive outside our systems (caches, downloads).
+- **Account deletion** is self-serve: open Settings, use the options menu
+  (three dots) on your Profile card, choose "Delete account", and confirm by
+  typing your username in capital letters. This permanently deletes your
+  account record (which cascades to your projects and sessions). Note that
+  copies of previously public Content may survive outside our systems
+  (caches, downloads). If you cannot access your account, email us from your
+  account address and we will help.
 
 ## 7. Security
 

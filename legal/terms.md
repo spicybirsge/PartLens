@@ -136,9 +136,9 @@ for other self-hosted instances, contact their operators.
 ## 9. Termination
 
 9.1. You may stop using the service at any time and delete your projects,
-parts, and manuals through the dashboard. (There is currently no
-self-serve full-account deletion; contact us at the email above for
-account-level deletion requests.)
+parts, and manuals through the dashboard. You may also delete your entire
+account at any time from Settings (Profile card options menu → "Delete
+account").
 
 9.2. We may suspend or terminate accounts that violate these Terms, remain
 inactive for extended periods, or threaten the security or operation of the
