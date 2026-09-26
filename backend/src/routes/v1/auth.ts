@@ -7,8 +7,9 @@ import { database } from "../../db/index.js"
 import { usersTable, sessionTable } from "../../db/schema.js"
 import { and, eq, ne, lte } from "drizzle-orm"
 import verifySession from "../../middleware/verifySession.js"
+import { authRateLimit, generalRateLimit } from "../../middleware/ratelimits.js"
 
-router.get('/google', async (req, res) => {
+router.get('/google', authRateLimit, async (req, res) => {
 
 
         const state = crypto.randomBytes(32).toString("hex");
@@ -29,7 +30,7 @@ router.get('/google', async (req, res) => {
 
 })
 
-router.get('/google/callback', async (req, res) => {
+router.get('/google/callback', authRateLimit, async (req, res) => {
         const { code, state } = req.query;
 
         if (!code || !state) {
@@ -99,7 +100,7 @@ router.get('/google/callback', async (req, res) => {
 })
 
 
-router.post("/obtain-session", async (req, res) => {
+router.post("/obtain-session", authRateLimit, async (req, res) => {
         const { callback_code } = req.body || {};
 
         if (!callback_code) {
@@ -118,17 +119,17 @@ router.post("/obtain-session", async (req, res) => {
 })
 
 
-router.get('/me', verifySession, async (req, res) => {
+router.get('/me', generalRateLimit, verifySession, async (req, res) => {
         return res.json({ success: true, message: "authentication success", user: req.user, code: 200 })
 })
 
-router.post("/logout", verifySession, async (req, res) => {
+router.post("/logout", authRateLimit, verifySession, async (req, res) => {
        await database.delete(sessionTable).where(eq(sessionTable.id, req.session!.id))
 
        return res.status(200).json({ success: true, message: "session terminated", code: 200 })
 })
 
-router.post("/logout-all", verifySession, async (req, res) => {
+router.post("/logout-all", authRateLimit, verifySession, async (req, res) => {
        await database.delete(sessionTable).where(and(
                eq(sessionTable.userId, req.session!.userId),
                ne(sessionTable.id, req.session!.id)
@@ -137,7 +138,7 @@ router.post("/logout-all", verifySession, async (req, res) => {
        return res.status(200).json({ success: true, message: "other sessions terminated", code: 200 })
 })
 
-router.get("/sessions", verifySession, async (req, res) => {
+router.get("/sessions", generalRateLimit, verifySession, async (req, res) => {
        const now = new Date()
 
        await database.delete(sessionTable).where(and(

@@ -4,7 +4,7 @@ import logger from "morgan"
 import cors from "cors"
 import errorHandler from "./middleware/errorHandler.js";
 import isAdminRequest from "./middleware/isAdminRequest.js";
-import { authRateLimit, generalRateLimit } from "./middleware/ratelimits.js";
+import { generalRateLimit } from "./middleware/ratelimits.js";
 
 import authRoutes from "./routes/v1/auth.js"
 import createRoutes from "./routes/v1/create.js"
@@ -39,7 +39,7 @@ if (process.env.NODE_ENV === 'production') {
 
 
 
-app.use('/api/v1/auth', authRateLimit, authRoutes);
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/create', generalRateLimit, createRoutes);
 app.use('/api/v1/delete', generalRateLimit, deleteRoutes);
 app.use('/api/v1/read', generalRateLimit, readRoutes);

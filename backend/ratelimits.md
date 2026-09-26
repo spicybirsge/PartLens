@@ -8,9 +8,16 @@ connection has been established.
 
 | API category | Limit | Counter key | Scope |
 | --- | --- | --- | --- |
-| Authentication (`/api/v1/auth`) | 20 requests per 15 minutes | Client IP | Shared across auth routes |
-| General API (`/api/v1/create`, `/delete`, `/read`, `/update`, `/upload`) | 300 requests per minute | Client IP | Shared across general API routes |
+| Login flow (`GET /api/v1/auth/google`, `GET /api/v1/auth/google/callback`, `POST /api/v1/auth/obtain-session`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/logout-all`) | 20 requests per 15 minutes | Client IP | Shared across these auth routes |
+| General API (`/api/v1/create`, `/delete`, `/read`, `/update`, `/upload`, plus `GET /api/v1/auth/me` and `GET /api/v1/auth/sessions`) | 300 requests per minute | Client IP | Shared across general API routes |
 | Uploads (`/api/v1/upload/glb`, `/pdf`, `/image`) | 20 requests per hour | Authenticated user ID | Shared across the user's upload routes |
+
+`GET /api/v1/auth/me` and `GET /api/v1/auth/sessions` intentionally use the
+general API limit instead of the login-flow limit: the client calls `/me` on
+every app open (and `/sessions` on the settings page), so keeping them in the
+strict 20-per-15-minutes bucket would lock normal users out after ~20 page
+loads. The strict bucket is reserved for the login/callback/session-issuance
+flow, where brute-force protection matters.
 
 Uploads pass through both the general API limit and the stricter per-user
 upload limit. The upload-specific limiter runs after session verification and

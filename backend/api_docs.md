@@ -1337,8 +1337,8 @@ requests. Please try again later.", data: null, code: 429 }`.
 
 | Scope | Limit | Key |
 |---|---|---|
-| `/api/v1/auth` | 20 / 15 min | client IP |
-| `/api/v1/create`, `/delete`, `/read`, `/update`, `/upload` | 300 / min | client IP |
+| Login flow: `GET /api/v1/auth/google`, `GET /api/v1/auth/google/callback`, `POST /api/v1/auth/obtain-session`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/logout-all` | 20 / 15 min | client IP |
+| `/api/v1/create`, `/delete`, `/read`, `/update`, `/upload`, plus `GET /api/v1/auth/me` and `GET /api/v1/auth/sessions` | 300 / min | client IP |
 | `POST /api/v1/upload/{glb,pdf,image}` (additional) | 20 / hour | authenticated user ID (falls back to IP when unauthenticated) |
 
 Uploads therefore pass through **both** the general and the per-user upload
