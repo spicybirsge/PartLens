@@ -4,7 +4,7 @@ import logger from "morgan"
 import cors from "cors"
 import errorHandler from "./middleware/errorHandler.js";
 import isAdminRequest from "./middleware/isAdminRequest.js";
-import { generalRateLimit } from "./middleware/ratelimits.js";
+import { generalRateLimit, initRateLimiters } from "./middleware/ratelimits.js";
 
 import authRoutes from "./routes/v1/auth.js"
 import createRoutes from "./routes/v1/create.js"
@@ -19,6 +19,7 @@ import { sql } from 'drizzle-orm';
 
 await initializeDatabase();
 await redisClient.connect();
+initRateLimiters();
 
 
 

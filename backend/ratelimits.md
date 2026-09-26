@@ -3,8 +3,15 @@
 The backend uses `express-rate-limit` with `rate-limit-redis`, backed by the
 existing Redis client. The counters are shared across backend instances and use
 fixed windows. Each policy counts every request, including failed requests.
-The limiters initialize lazily on the first request, after the server's Redis
-connection has been established.
+The limiter instances are created by `initRateLimiters()` during startup, after
+the Redis connection is established and before the server starts accepting
+requests. This ordering matters in both directions: `rate-limit-redis` loads
+its increment script inside `store.init` (which runs synchronously in
+`rateLimit()`), so construction requires a connected client; and
+`express-rate-limit` rejects construction inside a request handler with
+`ERR_ERL_CREATED_IN_REQUEST_HANDLER`. The exported middleware are stable
+placeholders that delegate to the initialized instances (returning `503` if
+hit before initialization, which cannot happen in normal startup).
 
 | API category | Limit | Counter key | Scope |
 | --- | --- | --- | --- |
