@@ -47,7 +47,7 @@ app.use('/api/v1/upload', generalRateLimit, uploadRoutes);
 
 
 
-app.get('/status', isAdminRequest, async (req, res) => {
+app.get('/status', generalRateLimit,isAdminRequest, async (req, res) => {
     let services = {
         postgres: "up",
         redis: "up"
