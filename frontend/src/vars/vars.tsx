@@ -1,6 +1,6 @@
 const vars = {
-    'BACKEND_URL' : 'http://localhost:5050',
-    'FRONTEND_URL': 'http://localhost:3000'
+    'BACKEND_URL' : 'https://partlens.koyeb.app',
+    'FRONTEND_URL': 'https://partlens.shaheerahamed.com'
 }
 
 export default vars;
