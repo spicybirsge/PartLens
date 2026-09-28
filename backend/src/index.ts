@@ -32,7 +32,7 @@ app.set('json spaces', 1)
 
 //below edit or remove config based on decided deployment
 if (process.env.NODE_ENV === 'production') {
-    app.set('trust proxy', true);
+   app.set('trust proxy', 1);
 }
 
 
