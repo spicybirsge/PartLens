@@ -8,12 +8,17 @@ import { usersTable, sessionTable } from "../../db/schema.js"
 import { and, eq, ne, lte } from "drizzle-orm"
 import verifySession from "../../middleware/verifySession.js"
 import { authRateLimit, generalRateLimit } from "../../middleware/ratelimits.js"
+import { validate } from "../../middleware/validate.js"
+import { googleAuthValidator, googleCallbackValidator, obtainSessionValidator } from "../../validators/auth.validator.js"
 
-router.get('/google', authRateLimit, async (req, res) => {
+router.get('/google', authRateLimit, validate(googleAuthValidator), async (req, res) => {
 
-
-        const state = crypto.randomBytes(32).toString("hex");
-        await redisClient.set(`${process.env.REDIS_PREFIX}:auth:state:${state}`, "1", { EX: 600 })
+        // The initiating tab keeps its own copy in sessionStorage.
+        const state = String(req.query.state);
+        const created = await redisClient.set(`${process.env.REDIS_PREFIX}:auth:state:${state}`, "1", { EX: 600, NX: true });
+        if (!created) {
+                return res.status(400).json({ success: false, message: "login already started; please try again", code: 400 });
+        }
 
         const params = new URLSearchParams({
                 client_id: process.env.GOOGLE_CLIENT_ID!,
@@ -30,28 +35,22 @@ router.get('/google', authRateLimit, async (req, res) => {
 
 })
 
-router.get('/google/callback', authRateLimit, async (req, res) => {
-        const { code, state } = req.query;
-
-        if (!code || !state) {
-                return res.status(400).json({ success: false, message: "invalid request", code: 400 });
-        }
+router.get('/google/callback', authRateLimit, validate(googleCallbackValidator), async (req, res) => {
+        const code = String(req.query.code);
+        const state = String(req.query.state);
 
         const stateKey = `${process.env.REDIS_PREFIX}:auth:state:${state}`;
-        const exists = await redisClient.get(stateKey);
+        const exists = await redisClient.getDel(stateKey);
 
         if (!exists) {
                 return res.status(400).json({ success: false, message: "invalid state", code: 400 });
         }
 
-        await redisClient.del(stateKey);
-
-
         const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({
-                        code: code as string,
+                        code,
                         client_id: process.env.GOOGLE_CLIENT_ID!,
                         client_secret: process.env.GOOGLE_CLIENT_SECRET!,
                         redirect_uri: `${process.env.BACKEND_URL}/api/v1/auth/google/callback`,
@@ -95,25 +94,24 @@ router.get('/google/callback', authRateLimit, async (req, res) => {
                 userAgent: userAgent
         })
 
-        await redisClient.set(`${process.env.REDIS_PREFIX}:auth:callback:${callbackToken}`, sessionToken, { EX: 60 })
-        return res.redirect(`${process.env.FRONTEND_URL}/auth/callback?code=${callbackToken}`)
+        // Both values must match to redeem the handoff, and a wrong state cannot consume it.
+        await redisClient.set(`${process.env.REDIS_PREFIX}:auth:callback:${callbackToken}:${state}`, sessionToken, { EX: 60 })
+        const callbackParams = new URLSearchParams({ code: callbackToken, state });
+        res.setHeader("Cache-Control", "no-store");
+        res.setHeader("Referrer-Policy", "no-referrer");
+        return res.redirect(`${process.env.FRONTEND_URL}/auth/callback?${callbackParams}`)
 })
 
 
-router.post("/obtain-session", authRateLimit, async (req, res) => {
-        const { callback_code } = req.body || {};
+router.post("/obtain-session", authRateLimit, validate(obtainSessionValidator), async (req, res) => {
+        const { callback_code, state } = req.body;
 
-        if (!callback_code) {
-                return res.status(400).json({ success: false, message: "invalid request", code: 400 })
-        }
-
-        let key = `${process.env.REDIS_PREFIX}:auth:callback:${callback_code}`
-        let sessionToken = await redisClient.get(key)
+        const key = `${process.env.REDIS_PREFIX}:auth:callback:${callback_code}:${state}`
+        const sessionToken = await redisClient.getDel(key)
         if (!sessionToken) {
                 return res.status(400).json({ success: false, message: "invalid callback code", code: 400 })
         }
-        await redisClient.del(key)
-
+        res.setHeader("Cache-Control", "no-store");
         return res.status(200).json({ success: true, message: "success", token: sessionToken, code: 200 })
 
 })

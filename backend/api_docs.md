@@ -80,6 +80,7 @@ backend/
 │   │   │                         #        /bookmark/project/:publicId, /bookmark/part/:partId
 │   │   └── upload.ts             # POST /upload/{glb,pdf,image}
 │   ├── validators/
+│   │   ├── auth.validator.ts     # Google OAuth start/callback and session exchange validators
 │   │   ├── project.validator.ts  # create/update/search/discover project validators
 │   │   ├── manual.validator.ts   # create part+manuals / single manual / update/delete validators
 │   │   ├── bookmark.validator.ts # bookmark create/delete/list validators
@@ -111,13 +112,19 @@ Route mounting (`src/index.ts`):
 
 ### Google OAuth Flow
 
-1. **Frontend** redirects user to `GET /api/v1/auth/google`
-2. Backend generates **32 random bytes, hex-encoded (64 chars)**, stores `1` in Redis at `${REDIS_PREFIX}:auth:state:<state>` with a **600-second (10-minute) TTL**, and redirects to Google's OAuth consent screen (`prompt=select_account`, `scope="openid email profile"`, `redirect_uri=${BACKEND_URL}/api/v1/auth/google/callback`)
+1. **Frontend** generates **32 cryptographically random bytes, lowercase hex-encoded (64 chars)** using `crypto.getRandomValues`, saves the state in the current tab's `sessionStorage` under `oauth_state`, and navigates to `GET /api/v1/auth/google?state=<state>`
+2. Backend validates the supplied state, stores `1` in Redis at `${REDIS_PREFIX}:auth:state:<state>` with a **600-second (10-minute) TTL** and `NX` (rejects an already pending state without refreshing its expiry), and redirects to Google's OAuth consent screen (`prompt=select_account`, `scope="openid email profile"`, `redirect_uri=${BACKEND_URL}/api/v1/auth/google/callback`)
 3. Google redirects back to `GET /api/v1/auth/google/callback` with `code` and `state`
-4. Backend validates single-use state against Redis (deletes it), exchanges the code at `https://oauth2.googleapis.com/token`, fetches the profile at `https://www.googleapis.com/oauth2/v3/userinfo`
-5. Existing user is looked up by `googleId = profile.sub`; otherwise a user is created with `email`, `emailVerified`, `name`, `avatarUrl = profile.picture`, `username = nanoid()` (21-char default). A session row is created (30-day expiry); the session token is **64 random bytes (`base64url`)** stored as SHA-256 hex. A callback token (**32 random bytes, `base64url`**) is stored in Redis at `${REDIS_PREFIX}:auth:callback:<token>` with a **60-second TTL**
-6. Frontend is redirected to `${FRONTEND_URL}/auth/callback?code=<callbackToken>`
-7. Frontend exchanges the callback token for the session token via `POST /api/v1/auth/obtain-session` (key is deleted on use)
+4. Backend validates the query parameters, atomically consumes the state using Redis `GETDEL`, exchanges the code at `https://oauth2.googleapis.com/token`, and fetches the profile at `https://www.googleapis.com/oauth2/v3/userinfo`
+5. Existing user is looked up by `googleId = profile.sub`; otherwise a user is created with `email`, `emailVerified`, `name`, `avatarUrl = profile.picture`, `username = nanoid()` (21-char default). A session row is created (30-day expiry); the session token is **64 random bytes (`base64url`)** stored in PostgreSQL as SHA-256 hex. The raw session token is temporarily stored in Redis at `${REDIS_PREFIX}:auth:callback:<callbackToken>:<state>` with a **60-second TTL**; the callback token is **32 random bytes, `base64url` (43 chars)**
+6. Frontend is redirected to `${FRONTEND_URL}/auth/callback?code=<callbackToken>&state=<state>`. It removes both parameters from the address bar and compares the returned state to its `sessionStorage` value. Missing or mismatched state stops login before any session exchange; an unrelated callback does not clear an existing pending state
+7. On a match, frontend removes `oauth_state` from `sessionStorage` and sends both `callback_code` and `state` to `POST /api/v1/auth/obtain-session`. Backend atomically consumes the matching Redis key with `GETDEL`; a wrong state cannot redeem or consume another state's callback code
+8. Frontend stores the returned session token in `localStorage` under `token`, verifies the session, and navigates to `/`. Frontend state verification or session-exchange failure returns the user to `/login`
+
+The Google redirect URI is unchanged; this flow requires no Google Console changes.
+The frontend callback redirect includes `Cache-Control: no-store` and
+`Referrer-Policy: no-referrer`; successful session-token responses include
+`Cache-Control: no-store`.
 
 ### Obtain Session Token
 
@@ -129,7 +136,8 @@ POST /api/v1/auth/obtain-session
 
 | Field | Type | Description |
 |---|---|---|
-| `callback_code` | string | The callback token received from the OAuth redirect |
+| `callback_code` | string | Required. The 43-character base64url callback token received from the backend redirect (`[A-Za-z0-9_-]`) |
+| `state` | string | Required. The matching 64-character lowercase hexadecimal OAuth state (`[a-f0-9]`), verified against the initiating tab's `sessionStorage` |
 
 **Response (200):**
 
@@ -146,19 +154,26 @@ POST /api/v1/auth/obtain-session
 
 | Code | Message | Cause |
 |---|---|---|
-| 400 | `"invalid request"` | Missing `callback_code` |
-| 400 | `"invalid callback code"` | Unknown/expired callback token |
+| 400 | `"invalid request body"` | Missing or malformed `callback_code` or `state`; includes field-level `errors` |
+| 400 | `"invalid callback code"` | Unknown, expired, already consumed, or state-mismatched callback token |
 
-> The returned `token` must be used as a **Bearer token** in the `Authorization` header for all subsequent authenticated requests. Callback codes are single-use.
+> The returned `token` must be used as a **Bearer token** in the `Authorization` header for all subsequent authenticated requests. Callback codes are single-use and bound to their original state. A mismatched state does not consume a valid callback code.
 
 ### Start Google OAuth
 
 ```
-GET /api/v1/auth/google
+GET /api/v1/auth/google?state=<oauth_state>
 ```
 
-No authentication required. Creates the Redis OAuth state (600 s TTL) and
+No authentication required. Requires a frontend-generated `state` query
+parameter: a string of exactly 64 lowercase hexadecimal characters. Stores
+the supplied state in Redis (600 s TTL; rejects an existing pending state) and
 returns a `302` redirect to `https://accounts.google.com/o/oauth2/v2/auth?...`.
+
+| Code | Message | Cause |
+|---|---|---|
+| 400 | `"invalid request body"` | Missing or malformed `state`; includes field-level `errors` |
+| 400 | `"login already started; please try again"` | This state is already pending in Redis; start again with a fresh state |
 
 ### Google OAuth Callback
 
@@ -166,13 +181,15 @@ returns a `302` redirect to `https://accounts.google.com/o/oauth2/v2/auth?...`.
 GET /api/v1/auth/google/callback?code=<google_code>&state=<oauth_state>
 ```
 
-Google calls this endpoint after consent. On success the backend creates a
-30-day session, stores a one-time callback code in Redis for 60 seconds, and
-returns a `302` redirect to `<FRONTEND_URL>/auth/callback?code=<callback_code>`.
+Google calls this endpoint after consent. Requires a non-empty string `code`
+and a 64-character lowercase hexadecimal string `state`. On success the
+backend atomically consumes the state, creates a 30-day session, stores a
+one-time callback code bound to that state in Redis for 60 seconds, and returns
+a `302` redirect to `<FRONTEND_URL>/auth/callback?code=<callback_code>&state=<oauth_state>`.
 
 | Code | Message | Cause |
 |---|---|---|
-| 400 | `"invalid request"` | Missing `code` or `state` |
+| 400 | `"invalid request body"` | Missing or malformed `code` or `state`; includes field-level `errors` |
 | 400 | `"invalid state"` | Unknown/expired/reused state |
 
 ### Get Current User
@@ -1356,7 +1373,7 @@ Validation failures (from `validate`):
   "success": false,
   "message": "invalid request body",
   "errors": [
-    { "msg": "field is required", "param": "name", "location": "body" }
+    { "type": "field", "msg": "field is required", "path": "name", "location": "body" }
   ],
   "code": 400
 }
@@ -1368,7 +1385,7 @@ Note the lowercase `message`. Most route-level `400`/`404` errors instead use
 
 | Status Code | Meaning / Example messages |
 |---|---|
-| 400 | Validation failure (`"invalid request body"` + `errors`); `"invalid request"`, `"invalid state"`, `"invalid callback code"` (auth); `"Invalid project identifier"`, `"Invalid part identifier"`, `"Invalid manual identifier"`, `"Invalid bookmark type"`; upload file errors |
+| 400 | Validation failure (`"invalid request body"` + `errors`); `"invalid state"`, `"invalid callback code"`, `"login already started; please try again"` (auth); `"Invalid project identifier"`, `"Invalid part identifier"`, `"Invalid manual identifier"`, `"Invalid bookmark type"`; upload file errors |
 | 401 | `"Unauthorized"` (missing/unknown/expired session); `"Invalid authorization header"` (non-`Bearer` or missing token) |
 | 404 | `"No matching route found."` (unknown path); `"Project not found"`, `"Part not found"`, `"Manual not found"`, `"User not found"`, `"Project bookmark not found"`, `"Part bookmark not found"` |
 | 408 | `"Upload timed out"` |
@@ -1511,7 +1528,7 @@ Index on `user_id`.
 | `ADMIN_KEY` | No | Optional; when unset `/status` never includes `services` |
 | `GOOGLE_CLIENT_ID` | ✅ | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | ✅ | Google OAuth client secret |
-| `FRONTEND_URL` | ✅ | OAuth callback redirect origin (`<FRONTEND_URL>/auth/callback?code=...`) |
+| `FRONTEND_URL` | ✅ | OAuth callback redirect origin (`<FRONTEND_URL>/auth/callback?code=...&state=...`) |
 | `BACKEND_URL` | ✅ | OAuth `redirect_uri` origin (`<BACKEND_URL>/api/v1/auth/google/callback`) |
 | `IMAGEKIT_PUBLIC_KEY` | ✅ | ImageKit public key (client/frontend use) |
 | `IMAGEKIT_PRIVATE_KEY` | ✅ | Required for `/upload/*`; missing key yields `500 "File upload is not configured"` |
@@ -1565,6 +1582,23 @@ here (`passOnStoreError: false`).
 ---
 
 ## Validators
+
+### Auth validators (`auth.validator.ts`)
+
+These three auth endpoints run `authRateLimit`, then the shared `validate(...)`
+middleware before the route handler. Missing or malformed fields return
+`400 { success: false, message: "invalid request body", errors: [...], code: 400 }`,
+including for query parameters. Values are not trimmed, lowercased, or coerced
+by the validators; arrays and objects are rejected.
+
+| Validator | Endpoint | Required fields |
+|---|---|---|
+| `googleAuthValidator` | `GET /api/v1/auth/google` | Query `state`: string matching `/^[a-f0-9]{64}$/` |
+| `googleCallbackValidator` | `GET /api/v1/auth/google/callback` | Query `code`: non-empty string; query `state`: same state rule |
+| `obtainSessionValidator` | `POST /api/v1/auth/obtain-session` | Body `callback_code`: string matching `/^[A-Za-z0-9_-]{43}$/`; body `state`: same state rule |
+
+Redis existence, expiry, state binding, and atomic single-use consumption are
+checked in the route handlers after input validation.
 
 ### `createProjectValidator`
 

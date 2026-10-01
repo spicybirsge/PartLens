@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import PageLoading from '../PageLoading';
 import vars from '@/vars/vars';
 import Navbar from '../Navbar';
+import { toast } from '@/components/ui/toast';
 export default function LoginPage() {
 
     const router = useRouter()
@@ -25,7 +26,20 @@ export default function LoginPage() {
 
             router.push("/", { scroll: false })
         }
-    }, [loaded, user, checkIfLoggedIn])
+    }, [loaded, user, checkIfLoggedIn, router])
+
+    const handleGoogleLogin = () => {
+        try {
+            const bytes = window.crypto.getRandomValues(new Uint8Array(32));
+            const state = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+            window.sessionStorage.setItem("oauth_state", state);
+            const loginUrl = new URL(`${vars.BACKEND_URL}/api/v1/auth/google`);
+            loginUrl.searchParams.set("state", state);
+            window.location.assign(loginUrl.toString());
+        } catch {
+            toast.add({ type: "error", description: "Unable to start login. Please allow browser storage and try again." });
+        }
+    }
 
     const handleBack = () => {
         const referrer = document.referrer
@@ -58,10 +72,10 @@ export default function LoginPage() {
                     <CardTitle className="text-2xl">Welcome back</CardTitle>
                     <CardDescription>Sign in to continue to your account</CardDescription>
                 </CardHeader>
-                <CardContent><a href={vars.BACKEND_URL+"/api/v1/auth/google"}>                    <Button variant="outline" className="w-full">
+                <CardContent><Button variant="outline" className="w-full" onClick={handleGoogleLogin}>
                     <GoogleIcon />
                     <span className="ml-2">Continue with Google</span>
-                </Button></a>
+                </Button>
                 <p className="mt-4 text-center text-xs text-muted-foreground">
                     By continuing, you agree to our{" "}
                     <Link

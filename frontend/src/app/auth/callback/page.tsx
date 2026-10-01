@@ -20,6 +20,7 @@ function CallbackPage() {
 
     const searchParams = useSearchParams();
     const callbackCode = searchParams.get("code");
+    const callbackState = searchParams.get("state");
 
     const hasChecked = useRef(false);
 
@@ -29,19 +30,10 @@ function CallbackPage() {
         hasChecked.current = true;
 
         async function obtainSession() {
-            if (!callbackCode) {
-                toast.add({
-                    type: "error",
-                    description: "Callback code not available to proceed",
-                });
-
-                return;
-            }
-
-            // Remove the callback code from the address bar immediately.
-            // The callbackCode variable still contains the original code.
+            // Keep the captured values, but remove them from the address bar.
             const url = new URL(window.location.href);
             url.searchParams.delete("code");
+            url.searchParams.delete("state");
 
             window.history.replaceState(
                 {},
@@ -50,22 +42,32 @@ function CallbackPage() {
             );
 
             try {
-
-
+                const expectedState = window.sessionStorage.getItem("oauth_state");
+                if (!callbackCode || !callbackState || !expectedState || callbackState !== expectedState) {
+                    toast.add({ type: "error", description: "Login could not be verified. Please start again from the login page." });
+                    router.replace("/login");
+                    return;
+                }
+                // Consume only a matching state; an unrelated callback must not cancel a pending login.
+                window.sessionStorage.removeItem("oauth_state");
                 const request = await fetch(vars.BACKEND_URL + "/api/v1/auth/obtain-session", {
                     method: 'POST',
+                    referrerPolicy: "no-referrer",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        callback_code: callbackCode
+                        callback_code: callbackCode,
+                        state: callbackState
                     })
                 })
 
                 const response = await request.json()
 
-                if (!response.success) {
-                    return toast.add({ type: 'error', description: response.message })
+                if (!request.ok || !response.success) {
+                    toast.add({ type: 'error', description: response.message || "Failed to complete login" });
+                    router.replace("/login");
+                    return;
                 }
 
                 window.localStorage.setItem("token", response.token)
@@ -83,11 +85,12 @@ function CallbackPage() {
                     type: "error",
                     description: "Failed to complete login",
                 });
+                router.replace("/login");
             }
         }
 
         obtainSession();
-    }, [callbackCode, checkIfLoggedIn, router]);
+    }, [callbackCode, callbackState, checkIfLoggedIn, router]);
 
     return <PageLoading></PageLoading>;
 }
