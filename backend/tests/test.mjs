@@ -5,8 +5,9 @@ import { test } from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 import * as expressValidator from "express-validator";
+import { customAlphabet } from "nanoid";
 
-// Run from backend: node tests/oauth-state.test.mjs
+// Run from backend: node tests/test.mjs
 // Exercise the actual route/component code with external services and browser APIs isolated.
 function loadSource(path, imports, globals = {}) {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");
@@ -27,11 +28,12 @@ function loadSource(path, imports, globals = {}) {
 const state = "a".repeat(64);
 const otherState = "b".repeat(64);
 
-function backend() {
+function backend({ newUser = false, collisions = 0 } = {}) {
     const routes = new Map();
     const entries = new Map();
     let now = 0;
     let googleRequests = 0;
+    const generatedUsernames = [];
     const read = (key) => {
         const entry = entries.get(key);
         return entry && entry.expires > now ? entry.value : null;
@@ -55,12 +57,19 @@ function backend() {
         express: { Router: () => router },
         "../../redis/redisClient.js": redis,
         crypto,
-        nanoid: { nanoid: () => "test-user" },
+        "../../lib/generateUsername.js": loadSource("../src/lib/generateUsername.ts", { nanoid: { customAlphabet } }),
         "../../db/index.js": { database: {
-            select: () => ({ from: () => ({ where: async () => [{ id: "user-id" }] }) }),
-            insert: () => ({ values: async () => {} }),
+            select: () => ({ from: () => ({ where: async () => newUser ? [] : [{ id: "user-id" }] }) }),
+            insert: () => ({ values: (values) => {
+                if (!values.username) return Promise.resolve();
+                generatedUsernames.push(values.username);
+                return { onConflictDoNothing: ({ target }) => {
+                    assert.equal(target, "username-column");
+                    return { returning: async () => generatedUsernames.length <= collisions ? [] : [{ id: "user-id" }] };
+                } };
+            } }),
         } },
-        "../../db/schema.js": { usersTable: {}, sessionTable: {} },
+        "../../db/schema.js": { usersTable: { username: "username-column" }, sessionTable: {} },
         "drizzle-orm": { and() {}, eq() {}, ne() {}, lte() {} },
         "../../middleware/verifySession.js": () => {},
         "../../middleware/ratelimits.js": {
@@ -82,6 +91,7 @@ function backend() {
     return {
         advance(seconds) { now += seconds; },
         get googleRequests() { return googleRequests; },
+        generatedUsernames,
         async request(route, data) {
             const res = {
                 statusCode: 200, headers: {},
@@ -109,6 +119,65 @@ async function completeGoogle(app) {
     assert.equal(callback.url.searchParams.get("state"), state);
     return callback.url.searchParams.get("code");
 }
+
+test("signup retries occupied usernames and generates lowercase identifiers", async () => {
+    const app = backend({ newUser: true, collisions: 2 });
+    await completeGoogle(app);
+    assert.equal(app.generatedUsernames.length, 3);
+    for (const username of app.generatedUsernames) assert.match(username, /^[a-z0-9_-]{21}$/);
+});
+
+test("signup stops after repeated collisions without creating a session", async () => {
+    const app = backend({ newUser: true, collisions: 10 });
+    await assert.rejects(completeGoogle(app), /Unable to allocate a unique username/);
+    assert.equal(app.generatedUsernames.length, 10);
+});
+
+test("username edits and profile queries normalize case", async () => {
+    const validators = loadSource("../src/validators/user.validator.ts", { "express-validator": expressValidator });
+    for (const [name, location] of [["updateUserValidator", "body"], ["getUserProfileValidator", "query"], ["getUserProjectsValidator", "query"]]) {
+        const req = { body: {}, query: {} };
+        req[location].username = "  ShaHeer  ";
+        for (const validator of validators[name]) await validator.run(req);
+        assert.ok(expressValidator.validationResult(req).isEmpty());
+        assert.equal(req[location].username, "shaheer");
+    }
+});
+
+test("username update database errors propagate while missing users return 404", async () => {
+    for (const outcome of ["collision", "missing", "failure"]) {
+        let handler;
+        const pgError = Object.assign(new Error("unique violation"), { code: "23505", constraint: "users_username_unique" });
+        const failure = new Error("database failure");
+        const database = {
+            select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }),
+            update: () => ({ set: () => ({ where: () => ({ returning: async () => {
+                if (outcome === "collision") throw new Error("Drizzle query failed", { cause: pgError });
+                if (outcome === "failure") throw failure;
+                return [];
+            } }) }) }),
+        };
+        loadSource("../src/routes/v1/update.ts", {
+            express: { Router: () => ({ patch(path, ...handlers) { if (path === "/user") handler = handlers.at(-1); } }) },
+            "../../middleware/verifySession.js": () => {},
+            "../../middleware/validate.js": { validate: () => () => {} },
+            "../../validators/project.validator.js": {},
+            "../../validators/manual.validator.js": {},
+            "../../validators/user.validator.js": {},
+            "../../db/index.js": { database },
+            "../../db/schema.js": { usersTable: {}, partsTable: {}, projectTable: {} },
+            "drizzle-orm": { and() {}, eq() {} },
+        }, { Error });
+        const res = { status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
+        const request = () => handler({ body: { username: "shaheer" }, user: { id: "user-id" } }, res);
+        if (outcome === "collision") await assert.rejects(request, /Drizzle query failed/);
+        else if (outcome === "failure") await assert.rejects(request, failure);
+        else {
+            await request();
+            assert.equal(res.code, 404);
+        }
+    }
+});
 
 test("rejects missing, malformed, array and object state before Google is contacted", async () => {
     const app = backend();

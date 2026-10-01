@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, timestamp, varchar, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, check, index, pgTable, timestamp, varchar, uuid, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const usersTable = pgTable("users", {
@@ -15,7 +15,9 @@ export const usersTable = pgTable("users", {
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  usernameLowercase: check("users_username_lowercase", sql`${table.username} = lower(${table.username})`),
+}));
 
 export const sessionTable = pgTable("sessions", {
   id: uuid("id").primaryKey().default(sql`uuidv7()`),

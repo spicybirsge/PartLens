@@ -26,7 +26,7 @@ export const updateUserValidator = [
     .optional()
     .isString().withMessage('username must be a string')
     .bail()
-    .trim()
+    .trim().toLowerCase()
     .isLength({ min: 1, max: 30 }).withMessage('username must be between 1 and 30 characters')
     .bail()
     .matches(/^[a-zA-Z0-9_-]+$/).withMessage('username must contain only letters, numbers, underscores, or hyphens'),
@@ -83,7 +83,7 @@ export const getUserProfileValidator = [
     .bail()
     .isString().withMessage('username must be a string')
     .bail()
-    .trim()
+    .trim().toLowerCase()
     .isLength({ min: 1, max: 30 }).withMessage('username must be between 1 and 30 characters')
     .bail()
     .matches(/^[a-zA-Z0-9_-]+$/).withMessage('username must contain only letters, numbers, underscores, or hyphens'),
@@ -95,7 +95,7 @@ export const getUserProjectsValidator = [
     .bail()
     .isString().withMessage('username must be a string')
     .bail()
-    .trim()
+    .trim().toLowerCase()
     .isLength({ min: 1, max: 30 }).withMessage('username must be between 1 and 30 characters')
     .bail()
     .matches(/^[a-zA-Z0-9_-]+$/).withMessage('username must contain only letters, numbers, underscores, or hyphens'),

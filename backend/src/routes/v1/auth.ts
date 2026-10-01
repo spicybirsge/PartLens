@@ -2,7 +2,7 @@ import express from "express"
 const router = express.Router()
 import redisClient from "../../redis/redisClient.js"
 import crypto from "crypto"
-import { nanoid } from "nanoid"
+import { generateUsername } from "../../lib/generateUsername.js"
 import { database } from "../../db/index.js"
 import { usersTable, sessionTable } from "../../db/schema.js"
 import { and, eq, ne, lte } from "drizzle-orm"
@@ -71,14 +71,17 @@ router.get('/google/callback', authRateLimit, validate(googleCallbackValidator),
         let [user] = await database.select().from(usersTable).where(eq(usersTable.googleId, profile.sub))
 
         if (!user) {
-                [user] = await database.insert(usersTable).values({
-                        googleId: profile.sub,
-                        email: profile.email,
-                        emailVerified: profile.email_verified,
-                        name: profile.name,
-                        avatarUrl: profile.picture,
-                        username: nanoid(),
-                }).returning();
+                for (let attempt = 0; attempt < 10 && !user; attempt++) {
+                        [user] = await database.insert(usersTable).values({
+                                googleId: profile.sub,
+                                email: profile.email,
+                                emailVerified: profile.email_verified,
+                                name: profile.name,
+                                avatarUrl: profile.picture,
+                                username: generateUsername(),
+                        }).onConflictDoNothing({ target: usersTable.username }).returning();
+                }
+                if (!user) throw new Error("Unable to allocate a unique username");
         }
 
         const sessionToken = crypto.randomBytes(64).toString("base64url");

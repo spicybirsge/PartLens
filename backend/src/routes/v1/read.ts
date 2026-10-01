@@ -14,7 +14,7 @@ import { escapeLikePattern } from "../../lib/escapeLike.js";
 const router = express.Router()
 
 router.get('/user', validate(getUserProfileValidator), async (req, res) => {
-        const username = String(req.query.username).trim();
+        const username = String(req.query.username).trim().toLowerCase();
 
         const [user] = await database
                 .select({
@@ -54,7 +54,7 @@ router.get('/user', validate(getUserProfileValidator), async (req, res) => {
 });
 
 router.get('/user/projects', validate(getUserProjectsValidator), async (req, res) => {
-        const username = String(req.query.username).trim();
+        const username = String(req.query.username).trim().toLowerCase();
         const rawCursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
         const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 10;
 

@@ -71,6 +71,13 @@
       "when": 1790235853735,
       "tag": "0009_condemned_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790860745408,
+      "tag": "0010_dry_vapor",
+      "breakpoints": true
     }
   ]
 }
